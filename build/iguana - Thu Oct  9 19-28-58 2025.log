@@ -1,0 +1,8 @@
+Thu Oct  9 19:28:58 2025 [INFO] Log file 'iguana - Thu Oct  9 19-28-58 2025.log' initialized
+Thu Oct  9 19:28:58 2025 [INFO] Engine starting up
+Thu Oct  9 19:28:59 2025 [INFO] Scanning for archetypes in: ../res/archetypes
+Thu Oct  9 19:28:59 2025 [INFO] Parsing archetype: cube_base
+Thu Oct  9 19:28:59 2025 [INFO] Parsing archetype: cube_blue
+Thu Oct  9 19:28:59 2025 [INFO] Parsing archetype: cube_red
+Thu Oct  9 19:29:25 2025 [INFO] Engine shutting down
+Thu Oct  9 19:29:25 2025 [INFO] Logging system shutting down

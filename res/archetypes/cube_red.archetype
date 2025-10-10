@@ -1,0 +1,5 @@
+inherits: cube_base
+color_r: 255
+color_g: 0
+color_b: 0
+velocity_x: 1.0

@@ -1,0 +1,26 @@
+#pragma once
+#include "include/raylib.h"
+
+// The main game singleton. Manages the game loop and core systems.
+class Game {
+public:
+    static Game& GetInstance();
+    void Init();
+    void Run();
+    void Shutdown();
+
+    // The time scale management function
+    void SetTimeScale(float scale);
+
+private:
+    Game() {}
+    void Update();
+    void Render();
+    
+    const int screenWidth = 800;
+    const int screenHeight = 450;
+    Camera3D camera = {};
+
+    // The master time scale for all game logic
+    float timeScale = 1.0f;
+};
