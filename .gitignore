@@ -1,0 +1,11 @@
+# Compiled output & binaries
+build/
+*.exe
+*.o
+*.a
+
+# Local user settings
+.vscode/
+
+# Log files
+*.log
