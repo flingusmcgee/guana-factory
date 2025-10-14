@@ -24,8 +24,6 @@ Game& Game::GetInstance() {
 
 // Setup the window, camera, and all managers
 void Game::Init() {
-    const int screenWidth = 800;
-    const int screenHeight = 450;
     const int targetFPS = 60;
 
     InitWindow(screenWidth, screenHeight, "guana factory");

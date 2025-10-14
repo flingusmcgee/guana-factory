@@ -4,7 +4,6 @@
 #include <string>
 #include <cctype>
 #include <filesystem>
-#include <iostream>
 
 // Provide a single, global instance
 ArchetypeManager& ArchetypeManager::GetInstance() {
