@@ -2,6 +2,7 @@
 #include "Archetype.h"
 #include <string>
 #include <map>
+#include <unordered_set>
 
 // Manager for loading and accessing archetypes
 class ArchetypeManager {
@@ -11,12 +12,16 @@ public:
     // The public-facing entry point
     void LoadArchetypesFromDirectory(const std::string& directoryPath);
     Archetype* GetArchetype(const std::string& name);
+    // Return the number of loaded archetypes
+    size_t GetLoadedCount() const;
 
 private:
     ArchetypeManager() {}
 
     // The private parser, dumb and stupid
     Archetype LoadFile(const std::string& filepath);
+    // Internal implementation used to track recursive loads and detect cycles
+    Archetype LoadFileInternal(const std::string& filepath, std::unordered_set<std::string>& loading);
     
     std::map<std::string, Archetype> archetypes;
     std::string current_directory; // Stores the directory
