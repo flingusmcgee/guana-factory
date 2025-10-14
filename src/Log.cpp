@@ -3,6 +3,7 @@
 #include <chrono>
 #include <ctime>
 #include <string>
+#include <mutex>
 
 // Define the static logfile member
 std::ofstream Log::logfile;
@@ -66,9 +67,12 @@ void Log::Error(const std::string& message) {
 
 // The core, private function that writes to all targets
 void Log::Write(LogLevel level, const std::string& message) {
+    static std::mutex write_mutex;
+    std::lock_guard<std::mutex> guard(write_mutex);
+
     std::string timestamp = GetTimestamp();
     std::string level_str;
-    
+
     // Console Output
     switch (level) {
         case LogLevel::Info:

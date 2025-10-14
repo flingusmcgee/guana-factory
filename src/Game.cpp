@@ -40,7 +40,20 @@ void Game::Init() {
 
     // Load assets and initialize systems
     AssetManager::LoadAssets();
-    ArchetypeManager::GetInstance().LoadArchetypesFromDirectory("../res/archetypes");
+    // Try a couple of likely archetype paths (executable working directory may vary)
+    const char* archetypePaths[] = { "res/archetypes", "../res/archetypes" };
+    bool loadedAny = false;
+    for (const char* ap : archetypePaths) {
+        ArchetypeManager::GetInstance().LoadArchetypesFromDirectory(ap);
+        if (ArchetypeManager::GetInstance().GetLoadedCount() > 0) {
+            Log::Info(std::string("Loaded archetypes from: ") + ap);
+            loadedAny = true;
+            break;
+        }
+    }
+    if (!loadedAny) {
+        Log::Warning("No archetypes loaded; checked common paths");
+    }
     EntityManager::GetInstance().Init();
 
     // Subscribe to events
