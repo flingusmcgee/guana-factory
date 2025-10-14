@@ -2,7 +2,8 @@
 #include "Log.h"
 #include <fstream>
 #include <string>
-#include <algorithm>
+
+// Provide a single, global instance
 ArchetypeManager& ArchetypeManager::GetInstance() {
     static ArchetypeManager instance;
     return instance;
@@ -21,19 +22,19 @@ static std::string trim(const std::string& s) {
     return std::string(start, end + 1);
 }
 
-// Scans a directory and loads all .archetype files within it
+// Scans a directory and commands the parser to load each file
 void ArchetypeManager::LoadArchetypesFromDirectory(const std::string& directoryPath) {
     Log::Info("Scanning for archetypes in: " + directoryPath);
+    current_directory = directoryPath; // Store the path for use in recursive calls
     FilePathList files = LoadDirectoryFiles(directoryPath.c_str());
 
     for (unsigned int i = 0; i < files.count; i++) {
         const char* path = files.paths[i];
         if (IsFileExtension(path, ".archetype")) {
-            // Extract the name from the filepath
             std::string name = GetFileNameWithoutExt(path);
-            // Check if we haven't already loaded this archetype as a parent
+            // Check prevents reloading an archetype that was already loaded as a parent
             if (archetypes.find(name) == archetypes.end()) {
-                LoadFile(path, name);
+                LoadFile(path);
             }
         }
     }
@@ -49,14 +50,15 @@ Archetype* ArchetypeManager::GetArchetype(const std::string& name) {
     return nullptr;
 }
 
-// The core function that recursively parses a file
-Archetype ArchetypeManager::LoadFile(const std::string& filepath, const std::string& name) {
+// The core function that recursively parses a file given its full path
+Archetype ArchetypeManager::LoadFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         Log::Error("Failed to open archetype file: " + filepath);
         return Archetype(); // Return an empty archetype on failure
     }
 
+    std::string name = GetFileNameWithoutExt(filepath.c_str());
     Log::Info("Parsing archetype: " + name);
     Archetype newArchetype;
     
@@ -68,22 +70,19 @@ Archetype ArchetypeManager::LoadFile(const std::string& filepath, const std::str
         std::string key = trim(line.substr(0, delimiterPos));
         std::string value = trim(line.substr(delimiterPos + 1));
 
-        // This is the recursive inheritance logic
         if (key == "inherits") {
-            // If this archetype inherits, first load the parent
             std::string parentName = value;
-            std::string parentFilepath = "../res/archetypes/" + parentName + ".archetype";
+            // This is the new, robust path construction
+            std::string parentFilepath = current_directory + "/" + parentName + ".archetype";
             
-            // Check if we've already loaded the parent
             if (archetypes.find(parentName) == archetypes.end()) {
-                // If not, load it now
-                newArchetype = LoadFile(parentFilepath, parentName);
+                // Perform the recursive call with the full, correct path
+                newArchetype = LoadFile(parentFilepath);
             } else {
-                // If we have just copy its data
                 newArchetype = archetypes.at(parentName);
             }
         }
-        // OVERRIDE OR SET FIELDS
+        // Overwrite or set fields
         else if (key == "tag") newArchetype.tag = value;
         else if (key == "model_id") newArchetype.model_id = value;
         else if (key == "color_r") newArchetype.color.r = (unsigned char)std::stoi(value);
@@ -95,7 +94,6 @@ Archetype ArchetypeManager::LoadFile(const std::string& filepath, const std::str
         else if (key == "velocity_z") newArchetype.velocity.z = std::stof(value);
     }
 
-    // Store the merged archetype
     archetypes[name] = newArchetype;
     file.close();
     return newArchetype;

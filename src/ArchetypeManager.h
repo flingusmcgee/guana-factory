@@ -8,12 +8,16 @@ class ArchetypeManager {
 public:
     static ArchetypeManager& GetInstance();
 
+    // The public-facing entry point
     void LoadArchetypesFromDirectory(const std::string& directoryPath);
     Archetype* GetArchetype(const std::string& name);
 
 private:
     ArchetypeManager() {}
-    // Private
-    Archetype LoadFile(const std::string& filepath, const std::string& name);
+
+    // The private parser, dumb and stupid
+    Archetype LoadFile(const std::string& filepath);
+    
     std::map<std::string, Archetype> archetypes;
+    std::string current_directory; // Stores the directory
 };
