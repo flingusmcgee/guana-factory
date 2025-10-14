@@ -72,7 +72,7 @@ Archetype ArchetypeManager::LoadFile(const std::string& filepath) {
 
         if (key == "inherits") {
             std::string parentName = value;
-            // This is the new, robust path construction
+            // This is the newpath construction
             std::string parentFilepath = current_directory + "/" + parentName + ".archetype";
             
             if (archetypes.find(parentName) == archetypes.end()) {
