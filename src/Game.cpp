@@ -6,15 +6,14 @@
 #include "Log.h"
 #include <iostream>
 
-
 // A temporary function to handle collision events for testing
 void OnCollision(const Event& event) {
     const CollisionEvent& collision = static_cast<const CollisionEvent&>(event);
 
     // Placeholder: print entity IDs to console
-std::cout << "WOAH: Collision Detected!" << std::endl;
-std::cout << "EntityA ID: " << collision.entityA->id << std::endl; // Example: print entityA's ID
-std::cout << "EntityB ID: " << collision.entityB->id << std::endl; // Example: print entityB's ID
+    std::cout << "WOAH: Collision Detected!" << std::endl;
+    std::cout << "EntityA ID: " << collision.entityA->id << std::endl;
+    std::cout << "EntityB ID: " << collision.entityB->id << std::endl;
 }
 
 // Provide a single, global instance of the game
@@ -60,11 +59,18 @@ void Game::Run() {
     }
 }
 
+// Set the global time scale for the game logic
+void Game::SetTimeScale(float scale) {
+    timeScale = scale;
+}
+
 // Update game logic
 void Game::Update() {
-    //std::cout << "Game::Update() has been called. DeltaTime is: " << GetFrameTime() << std::endl;
     UpdateCamera(&camera, CAMERA_FREE); 
-    EntityManager::GetInstance().UpdateAll(GetFrameTime());
+    
+    // Apply the time scale to the delta time before passing it to other systems
+    float scaledDeltaTime = GetFrameTime() * timeScale;
+    EntityManager::GetInstance().UpdateAll(scaledDeltaTime);
 }
 
 // Draw everything to the screen
