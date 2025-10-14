@@ -71,14 +71,27 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
     std::string name = GetFileNameWithoutExt(filepathStr.c_str());
     Log::Info("Parsing archetype: " + name);
 
-    // Cycle detection: if we're already loading this archetype, abort
+    // If we're already loading this archetype, abort to avoid cycles
     if (loading.find(name) != loading.end()) {
         Log::Error("Detected cyclic inheritance while loading: " + name);
         return Archetype();
     }
-    loading.insert(name);
 
-    Archetype newArchetype;
+    // Temporary containers: child values and flags to indicate which fields were explicitly set by the child
+    Archetype child;
+    struct Flags {
+        bool tag=false;
+        bool model_id=false;
+        bool color_r=false;
+        bool color_g=false;
+        bool color_b=false;
+        bool color_a=false;
+        bool vel_x=false;
+        bool vel_y=false;
+        bool vel_z=false;
+    } flags;
+
+    std::string parentName;
     std::string line;
     while (std::getline(file, line)) {
         std::string tline = trim(line);
@@ -91,50 +104,67 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
         std::string value = trim(tline.substr(delimiterPos + 1));
 
         if (key == "inherits") {
-            std::string parentName = value;
-            std::filesystem::path parentPath = std::filesystem::path(current_directory) / (parentName + ".archetype");
-            std::string parentFilepath = parentPath.string();
-
-            if (archetypes.find(parentName) == archetypes.end()) {
-                Archetype parent = LoadFileInternal(parentFilepath, loading);
-                // merge parent into newArchetype if needed
-                newArchetype = parent;
-            } else {
-                newArchetype = archetypes.at(parentName);
-            }
+            parentName = value;
         }
-        // Overwrite or set fields with guards for numeric conversions
-        else if (key == "tag") newArchetype.tag = value;
-        else if (key == "model_id") newArchetype.model_id = value;
+        else if (key == "tag") { child.tag = value; flags.tag = true; }
+        else if (key == "model_id") { child.model_id = value; flags.model_id = true; }
         else if (key == "color_r") {
-            try { newArchetype.color.r = static_cast<unsigned char>(std::stoi(value)); } catch (...) { Log::Warning("Invalid color_r for " + name + ", value='" + value + "'"); }
+            try { child.color.r = static_cast<unsigned char>(std::stoi(value)); flags.color_r = true; } catch (...) { Log::Warning("Invalid color_r for " + name + ", value='" + value + "'"); }
         }
         else if (key == "color_g") {
-            try { newArchetype.color.g = static_cast<unsigned char>(std::stoi(value)); } catch (...) { Log::Warning("Invalid color_g for " + name + ", value='" + value + "'"); }
+            try { child.color.g = static_cast<unsigned char>(std::stoi(value)); flags.color_g = true; } catch (...) { Log::Warning("Invalid color_g for " + name + ", value='" + value + "'"); }
         }
         else if (key == "color_b") {
-            try { newArchetype.color.b = static_cast<unsigned char>(std::stoi(value)); } catch (...) { Log::Warning("Invalid color_b for " + name + ", value='" + value + "'"); }
+            try { child.color.b = static_cast<unsigned char>(std::stoi(value)); flags.color_b = true; } catch (...) { Log::Warning("Invalid color_b for " + name + ", value='" + value + "'"); }
         }
         else if (key == "color_a") {
-            try { newArchetype.color.a = static_cast<unsigned char>(std::stoi(value)); } catch (...) { Log::Warning("Invalid color_a for " + name + ", value='" + value + "'"); }
+            try { child.color.a = static_cast<unsigned char>(std::stoi(value)); flags.color_a = true; } catch (...) { Log::Warning("Invalid color_a for " + name + ", value='" + value + "'"); }
         }
         else if (key == "velocity_x") {
-            try { newArchetype.velocity.x = std::stof(value); } catch (...) { Log::Warning("Invalid velocity_x for " + name + ", value='" + value + "'"); }
+            try { child.velocity.x = std::stof(value); flags.vel_x = true; } catch (...) { Log::Warning("Invalid velocity_x for " + name + ", value='" + value + "'"); }
         }
         else if (key == "velocity_y") {
-            try { newArchetype.velocity.y = std::stof(value); } catch (...) { Log::Warning("Invalid velocity_y for " + name + ", value='" + value + "'"); }
+            try { child.velocity.y = std::stof(value); flags.vel_y = true; } catch (...) { Log::Warning("Invalid velocity_y for " + name + ", value='" + value + "'"); }
         }
         else if (key == "velocity_z") {
-            try { newArchetype.velocity.z = std::stof(value); } catch (...) { Log::Warning("Invalid velocity_z for " + name + ", value='" + value + "'"); }
+            try { child.velocity.z = std::stof(value); flags.vel_z = true; } catch (...) { Log::Warning("Invalid velocity_z for " + name + ", value='" + value + "'"); }
         }
     }
+
+    file.close();
+
+    // Now perform loading/merging. Mark this archetype as loading to detect cycles during parent load.
+    loading.insert(name);
+
+    Archetype result;
+    // If we have a parent, try to load it (search in same directory as this file)
+    if (!parentName.empty()) {
+        // Prefer already-loaded parent
+        if (archetypes.find(parentName) != archetypes.end()) {
+            result = archetypes.at(parentName);
+        } else {
+            std::filesystem::path parentPath = p.parent_path() / (parentName + ".archetype");
+            Archetype parent = LoadFileInternal(parentPath.string(), loading);
+            result = parent;
+        }
+    }
+
+    // Merge: only apply child fields that were explicitly set
+    if (flags.tag) result.tag = child.tag;
+    if (flags.model_id) result.model_id = child.model_id;
+    if (flags.color_r) result.color.r = child.color.r;
+    if (flags.color_g) result.color.g = child.color.g;
+    if (flags.color_b) result.color.b = child.color.b;
+    if (flags.color_a) result.color.a = child.color.a;
+    if (flags.vel_x) result.velocity.x = child.velocity.x;
+    if (flags.vel_y) result.velocity.y = child.velocity.y;
+    if (flags.vel_z) result.velocity.z = child.velocity.z;
 
     // Finished loading this archetype
     loading.erase(name);
 
-    archetypes[name] = newArchetype;
-    file.close();
-    return newArchetype;
+    archetypes[name] = result;
+    return result;
 }
 
 size_t ArchetypeManager::GetLoadedCount() const {
