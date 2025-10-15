@@ -1,6 +1,4 @@
-// Lightweight C-linkage stubs for a small subset of raylib file helpers
-// These are intended for non-graphical builds (tests/CLI) where full raylib
-// is not linked. They provide minimal, portable behavior.
+// Not my code
 
 #include "include/raylib.h"
 #include <filesystem>
@@ -22,6 +20,10 @@ static char *alloc_cstr(const std::string &s) {
     return p;
 }
 
+// Only provide stubs if RAYLIB_STUBS is explicitly enabled. When linking the
+// full raylib library (e.g. lib/libraylib.a) these symbols are already
+// provided and defining the stubs would cause multiple definition errors.
+#if defined(RAYLIB_STUBS)
 extern "C" {
 
 bool IsFileExtension(const char *fileName, const char *ext) {
@@ -75,5 +77,8 @@ const char *GetFileNameWithoutExt(const char *filePath) {
     } catch (...) { s.clear(); }
     return s.c_str();
 }
+#if defined(RAYLIB_STUBS)
 
 } // extern "C"
+#endif
+#endif // RAYLIB_STUBS
