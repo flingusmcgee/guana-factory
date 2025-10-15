@@ -8,4 +8,5 @@ struct Archetype {
     std::string model_id;
     Color color = WHITE;
     Vector3 velocity = {};
+    std::string source_path; // file path this archetype was loaded from (for diagnostics)
 };

@@ -31,10 +31,11 @@ void ArchetypeManager::LoadArchetypesFromDirectory(const std::string& directoryP
     for (unsigned int i = 0; i < files.count; i++) {
         const char* path = files.paths[i];
         if (IsFileExtension(path, ".archetype")) {
-            std::string name = GetFileNameWithoutExt(path);
+            std::filesystem::path p(path);
+            std::string name = p.stem().string();
             // Check prevents reloading an archetype that was already loaded as a parent
             if (archetypes.find(name) == archetypes.end()) {
-                LoadFile(path);
+                LoadFileToMap(p.string());
             }
         }
     }
@@ -54,6 +55,18 @@ Archetype* ArchetypeManager::GetArchetype(const std::string& name) {
 Archetype ArchetypeManager::LoadFile(const std::string& filepath) {
     std::unordered_set<std::string> loading;
     return LoadFileInternal(filepath, loading);
+}
+
+bool ArchetypeManager::LoadFileToMap(const std::string& filepath) {
+    Archetype a = LoadFile(filepath);
+    if (a.tag.empty() && a.model_id.empty() && a.color.r==WHITE.r && a.velocity.x==0.0f) {
+        return false;
+    }
+    std::filesystem::path p(filepath);
+    std::string name = p.stem().string();
+    a.source_path = p.string();
+    archetypes[name] = a;
+    return true;
 }
 
 // Internal implementation with cycle detection
