@@ -1,8 +1,0 @@
-2025-10-14 19:56:05 [INFO] Log file 'iguana - 2025-10-14 19-56-05.log' initialized
-2025-10-14 19:56:05 [INFO] Running archetype tests
-2025-10-14 19:56:05 [INFO] Scanning for archetypes in: res/archetypes
-2025-10-14 19:56:05 [INFO] Parsing archetype: cube_base
-2025-10-14 19:56:05 [INFO] Parsing archetype: cube_blue
-2025-10-14 19:56:05 [INFO] Parsing archetype: cube_red
-2025-10-14 19:56:05 [WARNING] Archetype not found: cube
-2025-10-14 19:56:05 [ERROR] cube archetype missing
