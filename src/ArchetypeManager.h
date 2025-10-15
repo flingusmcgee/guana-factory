@@ -1,5 +1,6 @@
 #pragma once
 #include "Archetype.h"
+#include "include/raylib.h"
 #include <string>
 #include <cstddef>
 #include <map>

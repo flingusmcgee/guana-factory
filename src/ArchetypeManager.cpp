@@ -1,5 +1,6 @@
 #include "ArchetypeManager.h"
 #include "Log.h"
+#include "include/raylib.h"
 #include <fstream>
 #include <string>
 #include <cctype>
