@@ -124,28 +124,53 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
         if (key == "inherits") {
             parentName = value;
         }
-        else if (key == "tag") { child.tag = value; flags.tag = true; }
-        else if (key == "model_id") { child.model_id = value; flags.model_id = true; }
+    else if (key == "tag") { child.tag = value; flags.tag = true; child.populated = true; }
+    else if (key == "model_id") { child.model_id = value; flags.model_id = true; child.populated = true; }
         else if (key == "color_r") {
-            try { child.color.r = static_cast<unsigned char>(std::stoi(value)); flags.color_r = true; } catch (...) { Log::Warning("Invalid color_r for " + name + ", value='" + value + "'"); }
+            try {
+                child.color.r = static_cast<unsigned char>(std::stoi(value));
+                flags.color_r = true; child.populated = true;
+                if (child.color.r == WHITE.r) Log::Info("Archetype '" + name + "' explicitly sets color_r to white (default)");
+            } catch (...) { Log::Warning("Invalid color_r for " + name + ", value='" + value + "'"); }
         }
         else if (key == "color_g") {
-            try { child.color.g = static_cast<unsigned char>(std::stoi(value)); flags.color_g = true; } catch (...) { Log::Warning("Invalid color_g for " + name + ", value='" + value + "'"); }
+            try {
+                child.color.g = static_cast<unsigned char>(std::stoi(value));
+                flags.color_g = true; child.populated = true;
+                if (child.color.g == WHITE.g) Log::Info("Archetype '" + name + "' explicitly sets color_g to white (default)");
+            } catch (...) { Log::Warning("Invalid color_g for " + name + ", value='" + value + "'"); }
         }
         else if (key == "color_b") {
-            try { child.color.b = static_cast<unsigned char>(std::stoi(value)); flags.color_b = true; } catch (...) { Log::Warning("Invalid color_b for " + name + ", value='" + value + "'"); }
+            try {
+                child.color.b = static_cast<unsigned char>(std::stoi(value));
+                flags.color_b = true; child.populated = true;
+                if (child.color.b == WHITE.b) Log::Info("Archetype '" + name + "' explicitly sets color_b to white (default)");
+            } catch (...) { Log::Warning("Invalid color_b for " + name + ", value='" + value + "'"); }
         }
         else if (key == "color_a") {
-            try { child.color.a = static_cast<unsigned char>(std::stoi(value)); flags.color_a = true; } catch (...) { Log::Warning("Invalid color_a for " + name + ", value='" + value + "'"); }
+            try {
+                child.color.a = static_cast<unsigned char>(std::stoi(value));
+                flags.color_a = true; child.populated = true;
+                if (child.color.a == WHITE.a) Log::Info("Archetype '" + name + "' explicitly sets color_a to white (default)");
+            } catch (...) { Log::Warning("Invalid color_a for " + name + ", value='" + value + "'"); }
         }
         else if (key == "velocity_x") {
-            try { child.velocity.x = std::stof(value); flags.vel_x = true; } catch (...) { Log::Warning("Invalid velocity_x for " + name + ", value='" + value + "'"); }
+            try {
+                child.velocity.x = std::stof(value); flags.vel_x = true; child.populated = true;
+                if (child.velocity.x == 0.0f) Log::Info("Archetype '" + name + "' explicitly sets velocity_x to 0.0 (default)");
+            } catch (...) { Log::Warning("Invalid velocity_x for " + name + ", value='" + value + "'"); }
         }
         else if (key == "velocity_y") {
-            try { child.velocity.y = std::stof(value); flags.vel_y = true; } catch (...) { Log::Warning("Invalid velocity_y for " + name + ", value='" + value + "'"); }
+            try {
+                child.velocity.y = std::stof(value); flags.vel_y = true; child.populated = true;
+                if (child.velocity.y == 0.0f) Log::Info("Archetype '" + name + "' explicitly sets velocity_y to 0.0 (default)");
+            } catch (...) { Log::Warning("Invalid velocity_y for " + name + ", value='" + value + "'"); }
         }
         else if (key == "velocity_z") {
-            try { child.velocity.z = std::stof(value); flags.vel_z = true; } catch (...) { Log::Warning("Invalid velocity_z for " + name + ", value='" + value + "'"); }
+            try {
+                child.velocity.z = std::stof(value); flags.vel_z = true; child.populated = true;
+                if (child.velocity.z == 0.0f) Log::Info("Archetype '" + name + "' explicitly sets velocity_z to 0.0 (default)");
+            } catch (...) { Log::Warning("Invalid velocity_z for " + name + ", value='" + value + "'"); }
         }
     }
 
