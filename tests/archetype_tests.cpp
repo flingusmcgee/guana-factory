@@ -14,14 +14,27 @@ int main() {
         return 2;
     }
 
-    // Basic individual file load check
-    bool ok = false;
-    Archetype* a = ArchetypeManager::GetInstance().GetArchetype("cube_red");
-    if (a && a->tag == "cube_red") ok = true;
+    // Detailed checks for known archetypes
+    {
+        Archetype* a = ArchetypeManager::GetInstance().GetArchetype("cube");
+        if (!a) { Log::Error("cube archetype missing"); return 2; }
+        if (a->tag != "cube") { Log::Error("cube.tag mismatch"); return 2; }
+        if (a->model_id != "cube") { Log::Error("cube.model_id mismatch"); return 2; }
+        if (a->color.r != 128 || a->color.g != 128 || a->color.b != 128) { Log::Error("cube.color mismatch"); return 2; }
+    }
 
-    if (!ok) {
-        Log::Error("cube_red archetype missing or malformed");
-        return 2;
+    {
+        Archetype* a = ArchetypeManager::GetInstance().GetArchetype("cube_red");
+        if (!a) { Log::Error("cube_red archetype missing"); return 2; }
+        if (a->color.r != 255 || a->color.g != 0 || a->color.b != 0) { Log::Error("cube_red.color mismatch"); return 2; }
+        if (a->velocity.x != 1.0f) { Log::Error("cube_red.velocity.x mismatch"); return 2; }
+    }
+
+    {
+        Archetype* a = ArchetypeManager::GetInstance().GetArchetype("cube_blue");
+        if (!a) { Log::Error("cube_blue archetype missing"); return 2; }
+        if (a->color.r != 0 || a->color.g != 0 || a->color.b != 255) { Log::Error("cube_blue.color mismatch"); return 2; }
+        if (a->velocity.x != -1.0f) { Log::Error("cube_blue.velocity.x mismatch"); return 2; }
     }
 
     Log::Info("Archetype tests passed");
