@@ -2,6 +2,7 @@
 #include <fstream>
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 
 std::unordered_map<std::string, std::string> Config::values;
 
@@ -14,6 +15,21 @@ std::string Config::trim(const std::string& s) {
 }
 
 bool Config::Load(const std::string& path) {
+    namespace fs = std::filesystem;
+
+    // If the file does not exist, try to copy from example next to repo root
+    if (!fs::exists(path)) {
+        // try to locate config.ini.example next to the executable or repo root
+        std::string example = "config.ini.example";
+        if (fs::exists(example)) {
+            try {
+                fs::copy_file(example, path, fs::copy_options::overwrite_existing);
+            } catch (...) {
+                // fallback: continue, we'll try to open whatever exists
+            }
+        }
+    }
+
     std::ifstream f(path);
     if (!f.is_open()) return false;
     std::string line;
@@ -27,6 +43,12 @@ bool Config::Load(const std::string& path) {
         values[key] = value;
     }
     return true;
+}
+
+float Config::GetFloat(const std::string& key, float defaultValue) {
+    auto it = values.find(key);
+    if (it == values.end()) return defaultValue;
+    try { return std::stof(it->second); } catch (...) { return defaultValue; }
 }
 
 bool Config::GetBool(const std::string& key, bool defaultValue) {

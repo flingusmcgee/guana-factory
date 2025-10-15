@@ -25,22 +25,28 @@ Game& Game::GetInstance() {
 
 // Setup the window, camera, and all managers
 void Game::Init() {
-    const int targetFPS = 60;
-    // Load configuration (optional)
+    int targetFPS = 60;
+    // Load configuration (optional). If config.ini doesn't exist but config.ini.example does
+    // the loader will try to copy it into place.
     bool cfgLoaded = false;
     if (Config::Load("config.ini")) cfgLoaded = true;
     else if (Config::Load("../config.ini")) cfgLoaded = true;
 
     // Apply config-driven debug/time settings
     bool debugEnabled = Config::GetBool("debug.enabled", false);
-    float cfgTimeScale = 1.0f;
-    try { cfgTimeScale = std::stof(Config::GetString("debug.time_scale", "1.0")); } catch(...) {}
+    float cfgTimeScale = Config::GetFloat("debug.time_scale", 1.0f);
     if (debugEnabled) {
         Log::Info("Debug enabled via config");
         SetTimeScale(cfgTimeScale);
     }
 
-    InitWindow(screenWidth, screenHeight, "guana factory");
+    // Window settings
+    std::string winTitle = Config::GetString("window.title", "guana factory");
+    screenWidth = Config::GetInt("window.width", screenWidth);
+    screenHeight = Config::GetInt("window.height", screenHeight);
+    targetFPS = Config::GetInt("window.target_fps", targetFPS);
+
+    InitWindow(screenWidth, screenHeight, winTitle.c_str());
     SetTargetFPS(targetFPS);
 
     // Camera setup
@@ -51,17 +57,30 @@ void Game::Init() {
     camera.projection = CAMERA_PERSPECTIVE;
 
     // Load assets and initialize systems
+    // Allow the icon path to be configurable
     AssetManager::LoadAssets();
     // Try a couple of likely archetype paths (executable working directory may vary)
-    const char* archetypePaths[] = { "res/archetypes", "../res/archetypes" };
+    // Archetype paths: support a comma-separated list in config
+    std::string apaths = Config::GetString("archetypes.paths", "res/archetypes,../res/archetypes");
     bool loadedAny = false;
-    for (const char* ap : archetypePaths) {
-        ArchetypeManager::GetInstance().LoadArchetypesFromDirectory(ap);
-        if (ArchetypeManager::GetInstance().GetLoadedCount() > 0) {
-            Log::Info(std::string("Loaded archetypes from: ") + ap);
-            loadedAny = true;
-            break;
+    size_t start = 0;
+    while (start < apaths.size()) {
+        size_t comma = apaths.find(',', start);
+        std::string token = (comma == std::string::npos) ? apaths.substr(start) : apaths.substr(start, comma - start);
+        // trim
+        size_t s = 0; while (s < token.size() && std::isspace(static_cast<unsigned char>(token[s]))) ++s;
+        size_t e = token.size(); while (e > s && std::isspace(static_cast<unsigned char>(token[e-1]))) --e;
+        std::string path = token.substr(s, e - s);
+        if (!path.empty()) {
+            ArchetypeManager::GetInstance().LoadArchetypesFromDirectory(path.c_str());
+            if (ArchetypeManager::GetInstance().GetLoadedCount() > 0) {
+                Log::Info(std::string("Loaded archetypes from: ") + path);
+                loadedAny = true;
+                break;
+            }
         }
+        if (comma == std::string::npos) break;
+        start = comma + 1;
     }
     if (!loadedAny) {
         Log::Warning("No archetypes loaded; checked common paths");

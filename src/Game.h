@@ -17,8 +17,8 @@ private:
     void Update();
     void Render();
     
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+    int screenWidth = 800;
+    int screenHeight = 450;
     Camera3D camera = {};
 
     // The master time scale for all game logic

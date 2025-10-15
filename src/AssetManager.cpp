@@ -1,4 +1,6 @@
 #include "AssetManager.h"
+#include "Config.h"
+#include <filesystem>
 
 // Define the static maps
 std::map<std::string, Model> AssetManager::models;
@@ -8,10 +10,22 @@ std::map<std::string, Texture2D> AssetManager::textures;
 void AssetManager::LoadAssets() {
     models["cube"] = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
 
-    // Load and set the fuck boys
-    Image icon = LoadImage("../res/icon.png");
-    SetWindowIcon(icon);
-    UnloadImage(icon);
+    // Load and set the window icon (path configurable)
+    std::string iconPath = Config::GetString("window.icon", "../res/icon.png");
+    namespace fs = std::filesystem;
+    if (fs::exists(iconPath)) {
+        Image icon = LoadImage(iconPath.c_str());
+        SetWindowIcon(icon);
+        UnloadImage(icon);
+    } else {
+        // try relative fallback
+        std::string alt = std::string("res/icon.png");
+        if (fs::exists(alt)) {
+            Image icon = LoadImage(alt.c_str());
+            SetWindowIcon(icon);
+            UnloadImage(icon);
+        }
+    }
 }
 
 // Unload all assets from memory
