@@ -5,6 +5,7 @@
 #include <string>
 #include <mutex>
 #include <filesystem>
+#include "Config.h"
 
 // Define the static logfile member
 std::ofstream Log::logfile;
@@ -44,8 +45,9 @@ void Log::Init() {
     std::string filename = "iguana - " + timestamp + ".log";
 
     // Allow overriding the log directory from config
-    std::string defaultLogDir = std::string("build") + std::filesystem::path::preferred_separator + std::string("log");
-    std::string logDirStr = "build/log";
+    std::filesystem::path defaultLogDirPath = std::filesystem::path("build") / "log";
+    std::string defaultLogDir = defaultLogDirPath.string();
+    std::string logDirStr = defaultLogDir;
     try {
         // Config may not be loaded yet; attempt to load a cache by calling Config::Load
         // (harmless if it's already loaded or missing)
