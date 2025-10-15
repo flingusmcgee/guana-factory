@@ -60,7 +60,7 @@ Archetype ArchetypeManager::LoadFile(const std::string& filepath) {
 
 bool ArchetypeManager::LoadFileToMap(const std::string& filepath) {
     Archetype a = LoadFile(filepath);
-    if (a.tag.empty() && a.model_id.empty() && a.color.r==WHITE.r && a.velocity.x==0.0f) {
+    if (a.isEmpty()) {
         return false;
     }
     std::filesystem::path p(filepath);
@@ -162,7 +162,11 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
             result = archetypes.at(parentName);
         } else {
             std::filesystem::path parentPath = p.parent_path() / (parentName + ".archetype");
+            // Attempt to load the parent; if it fails, log the attempted path for easier debugging
             Archetype parent = LoadFileInternal(parentPath.string(), loading);
+            if (parent.isEmpty()) {
+                Log::Error("Failed to load parent archetype '" + parentName + "' for child '" + name + "'. Tried path: " + parentPath.string());
+            }
             result = parent;
         }
     }
