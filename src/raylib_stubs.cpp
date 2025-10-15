@@ -22,7 +22,7 @@ static char *alloc_cstr(const std::string &s) {
 
 // Only provide stubs if RAYLIB_STUBS is explicitly enabled. When linking the
 // full raylib library (e.g. lib/libraylib.a) these symbols are already
-// provided and defining the stubs would cause multiple definition errors.
+// provided and defining the stubs would cause multiple definition errors
 #if defined(RAYLIB_STUBS)
 extern "C" {
 

@@ -66,7 +66,7 @@ bool ArchetypeManager::LoadFileToMap(const std::string& filepath) {
     std::filesystem::path p(filepath);
     std::string name = p.stem().string();
     // Prefer the archetype's tag as the map key when available (so files like cube_base.archetype
-    // that declare tag: cube are stored under 'cube' as tests expect).
+    // that declare tag: cube are stored under 'cube')
     if (!a.tag.empty()) {
         name = a.tag;
     }
@@ -83,7 +83,7 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
     std::ifstream file(filepathStr);
     if (!file.is_open()) {
         Log::Error("Failed to open archetype file: " + filepathStr);
-        return Archetype(); // Return an empty archetype on failure
+        return Archetype(); // Return an empty archetype
     }
 
     std::string name = GetFileNameWithoutExt(filepathStr.c_str());
@@ -95,7 +95,7 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
         return Archetype();
     }
 
-    // Temporary containers: child values and flags to indicate which fields were explicitly set by the child
+    // Temporary containers
     Archetype child;
     struct Flags {
         bool tag=false;
@@ -176,7 +176,7 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
 
     file.close();
 
-    // Now perform loading/merging. Mark this archetype as loading to detect cycles during parent load.
+    // Now perform loading/merging. Mark this archetype as loading
     loading.insert(name);
 
     Archetype result;
@@ -208,7 +208,7 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
     if (flags.vel_z) result.velocity.z = child.velocity.z;
 
     // Mark result as populated if the parent actually had data (result.populated already set),
-    // or if the child explicitly set any field.
+    // or if the child explicitly set any field
     bool childSetAny = flags.tag || flags.model_id || flags.color_r || flags.color_g || flags.color_b || flags.color_a || flags.vel_x || flags.vel_y || flags.vel_z;
     if (result.populated || childSetAny) {
         result.populated = true;

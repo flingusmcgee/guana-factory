@@ -14,7 +14,7 @@ public:
     virtual EventType GetType() const = 0;
 };
 
-// Event for when two entities collide.
+// Event for when two entities collide
 struct CollisionEvent : public Event {
     Entity* entityA;
     Entity* entityB;

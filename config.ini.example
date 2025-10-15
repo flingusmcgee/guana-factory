@@ -1,3 +1,0 @@
-; Example config.ini
-debug.enabled = true
-debug.time_scale = 1.0

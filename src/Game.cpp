@@ -26,8 +26,7 @@ Game& Game::GetInstance() {
 // Setup the window, camera, and all managers
 void Game::Init() {
     int targetFPS = 60;
-    // Load configuration (optional). If config.ini doesn't exist but config.ini.example does
-    // the loader will try to copy it into place.
+    // Load configuration (optional)
     bool cfgLoaded = false;
     if (Config::Load("config.ini")) cfgLoaded = true;
     else if (Config::Load("../config.ini")) cfgLoaded = true;

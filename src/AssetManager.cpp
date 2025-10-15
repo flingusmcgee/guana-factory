@@ -10,7 +10,7 @@ std::map<std::string, Texture2D> AssetManager::textures;
 void AssetManager::LoadAssets() {
     models["cube"] = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
 
-    // Load and set the window icon (path configurable)
+    // Load and set the fuck boys
     std::string iconPath = Config::GetString("window.icon", "../res/icon.png");
     namespace fs = std::filesystem;
     if (fs::exists(iconPath)) {

@@ -1,7 +1,7 @@
 #pragma once
 #include "include/raylib.h"
 
-// The main game singleton. Manages the game loop and core systems.
+// The main game singleton. Manages the game loop and core systems
 class Game {
 public:
     static Game& GetInstance();

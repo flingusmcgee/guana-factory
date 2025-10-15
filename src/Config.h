@@ -2,10 +2,10 @@
 #include <string>
 #include <unordered_map>
 
-// Very small INI-like config loader used for de bug, paths, etc.
+// Very small INI-like config loader used for de bug, paths, etc
 class Config {
 public:
-    // Load a simple key=value config file. Returns true on success.
+    // Load a simple key=value config file
     static bool Load(const std::string& path);
 
     // Accessors with defaults

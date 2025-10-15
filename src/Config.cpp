@@ -1,15 +1,19 @@
 #include "Config.h"
 #include <fstream>
 #include <algorithm>
-@@
-            try {
-    std::ifstream f(path);
-    if (!f.is_open()) return false;
-                // fallback: continue, we'll try to open whatever exists
-            }
-        }
-    }
+#include <cctype>
 
+std::unordered_map<std::string, std::string> Config::values;
+
+std::string Config::trim(const std::string& s) {
+    size_t start = 0;
+    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) ++start;
+    size_t end = s.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(s[end-1]))) --end;
+    return s.substr(start, end - start);
+}
+
+bool Config::Load(const std::string& path) {
     std::ifstream f(path);
     if (!f.is_open()) return false;
     std::string line;
