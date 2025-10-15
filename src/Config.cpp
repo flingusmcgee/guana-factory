@@ -1,30 +1,10 @@
 #include "Config.h"
 #include <fstream>
 #include <algorithm>
-#include <cctype>
-#include <filesystem>
-
-std::unordered_map<std::string, std::string> Config::values;
-
-std::string Config::trim(const std::string& s) {
-    size_t start = 0;
-    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) ++start;
-    size_t end = s.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(s[end-1]))) --end;
-    return s.substr(start, end - start);
-}
-
-bool Config::Load(const std::string& path) {
-    namespace fs = std::filesystem;
-
-    // If the file does not exist, try to copy from example next to repo root
-    if (!fs::exists(path)) {
-        // try to locate config.ini.example next to the executable or repo root
-        std::string example = "config.ini.example";
-        if (fs::exists(example)) {
+@@
             try {
-                fs::copy_file(example, path, fs::copy_options::overwrite_existing);
-            } catch (...) {
+    std::ifstream f(path);
+    if (!f.is_open()) return false;
                 // fallback: continue, we'll try to open whatever exists
             }
         }
