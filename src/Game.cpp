@@ -4,6 +4,7 @@
 #include "EventManager.h"
 #include "ArchetypeManager.h"
 #include "Log.h"
+#include "Config.h"
 #include <iostream>
 
 // A temporary function to handle collision events for testing
@@ -25,6 +26,19 @@ Game& Game::GetInstance() {
 // Setup the window, camera, and all managers
 void Game::Init() {
     const int targetFPS = 60;
+    // Load configuration (optional)
+    bool cfgLoaded = false;
+    if (Config::Load("config.ini")) cfgLoaded = true;
+    else if (Config::Load("../config.ini")) cfgLoaded = true;
+
+    // Apply config-driven debug/time settings
+    bool debugEnabled = Config::GetBool("debug.enabled", false);
+    float cfgTimeScale = 1.0f;
+    try { cfgTimeScale = std::stof(Config::GetString("debug.time_scale", "1.0")); } catch(...) {}
+    if (debugEnabled) {
+        Log::Info("Debug enabled via config");
+        SetTimeScale(cfgTimeScale);
+    }
 
     InitWindow(screenWidth, screenHeight, "guana factory");
     SetTargetFPS(targetFPS);

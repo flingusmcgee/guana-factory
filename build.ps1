@@ -41,6 +41,7 @@ if (-not (Test-Path build)) { New-Item -ItemType Directory -Path build | Out-Nul
 $srcFiles = @(
     'main.cpp',
     'src/Game.cpp',
+    'src/Config.cpp',
     'src/EventManager.cpp',
     'src/EntityManager.cpp',
     'src/AssetManager.cpp',
