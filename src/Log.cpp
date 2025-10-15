@@ -4,6 +4,7 @@
 #include <ctime>
 #include <string>
 #include <mutex>
+#include <filesystem>
 
 // Define the static logfile member
 std::ofstream Log::logfile;
@@ -41,9 +42,17 @@ void Log::Init() {
         }
     }
     std::string filename = "iguana - " + timestamp + ".log";
-    
-    // Command the one, true, static scribe to open the file
-    logfile.open(filename, std::ios::out | std::ios::trunc);
+
+    // Ensure build/log directory exists and place logs there
+    try {
+        std::filesystem::path logDir = std::filesystem::path("build") / "log";
+        if (!std::filesystem::exists(logDir)) std::filesystem::create_directories(logDir);
+        std::filesystem::path full = logDir / filename;
+        logfile.open(full.string(), std::ios::out | std::ios::trunc);
+    } catch (...) {
+        // fallback to current directory if filesystem operations fail
+        logfile.open(filename, std::ios::out | std::ios::trunc);
+    }
 
     if (!logfile.is_open()) {
         std::cerr << "CRITICAL ERROR: Failed to open " << filename << " for writing" << std::endl;
