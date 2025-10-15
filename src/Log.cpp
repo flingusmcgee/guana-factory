@@ -43,9 +43,20 @@ void Log::Init() {
     }
     std::string filename = "iguana - " + timestamp + ".log";
 
-    // Ensure build/log directory exists and place logs there
+    // Allow overriding the log directory from config
+    std::string defaultLogDir = std::string("build") + std::filesystem::path::preferred_separator + std::string("log");
+    std::string logDirStr = "build/log";
     try {
-        std::filesystem::path logDir = std::filesystem::path("build") / "log";
+        // Config may not be loaded yet; attempt to load a cache by calling Config::Load
+        // (harmless if it's already loaded or missing)
+        Config::Load("config.ini");
+        logDirStr = Config::GetString("log.dir", defaultLogDir);
+    } catch (...) {
+        logDirStr = defaultLogDir;
+    }
+
+    try {
+        std::filesystem::path logDir(logDirStr);
         if (!std::filesystem::exists(logDir)) std::filesystem::create_directories(logDir);
         std::filesystem::path full = logDir / filename;
         logfile.open(full.string(), std::ios::out | std::ios::trunc);
