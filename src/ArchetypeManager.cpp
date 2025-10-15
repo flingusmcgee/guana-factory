@@ -182,6 +182,12 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
     if (flags.vel_y) result.velocity.y = child.velocity.y;
     if (flags.vel_z) result.velocity.z = child.velocity.z;
 
+    // Mark result as populated if either parent had data or child set any field
+    bool childSetAny = flags.tag || flags.model_id || flags.color_r || flags.color_g || flags.color_b || flags.color_a || flags.vel_x || flags.vel_y || flags.vel_z;
+    if (childSetAny || !parentName.empty() || !result.tag.empty() || !result.model_id.empty()) {
+        result.populated = true;
+    }
+
     // Finished loading this archetype
     loading.erase(name);
 
