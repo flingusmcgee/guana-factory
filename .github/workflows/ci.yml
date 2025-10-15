@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y g++ build-essential
+
+      - name: Build archetype tests
+        run: |
+          mkdir -p build
+          g++ -std=c++17 -I. -I./src -I./src/include tests/archetype_tests.cpp src/ArchetypeManager.cpp src/Log.cpp -o build/archetype_tests
+
+      - name: Run tests
+        run: ./build/archetype_tests
