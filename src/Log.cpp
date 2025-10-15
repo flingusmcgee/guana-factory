@@ -10,14 +10,25 @@ std::ofstream Log::logfile;
 
 // A private helper function to get a clean timestamp string
 static std::string GetTimestamp() noexcept {
-    auto now = std::chrono::system_clock::now();
-    auto in_time_t = std::chrono::system_clock::to_time_t(now);
-    
-    char time_buffer[26];
-    ctime_s(time_buffer, sizeof(time_buffer), &in_time_t);
-    std::string timestamp(time_buffer);
-    timestamp.pop_back(); // Remove the trailing newline character
-    return timestamp;
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    std::time_t in_time_t = system_clock::to_time_t(now);
+
+    // Use thread-safe localtime variants where available and format with strftime
+    std::tm tm{};
+#if defined(_WIN32) || defined(_WIN64)
+    // MSVC / Windows
+    localtime_s(&tm, &in_time_t);
+#else
+    // POSIX
+    localtime_r(&in_time_t, &tm);
+#endif
+
+    char time_buffer[64];
+    if (std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", &tm) == 0) {
+        return std::string();
+    }
+    return std::string(time_buffer);
 }
 
 // Initialize the logging system and open the timestamped log file

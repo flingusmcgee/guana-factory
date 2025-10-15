@@ -1,0 +1,7 @@
+2025-10-14 19:59:38 [INFO] Log file 'iguana - 2025-10-14 19-59-38.log' initialized
+2025-10-14 19:59:38 [INFO] Running archetype tests
+2025-10-14 19:59:38 [INFO] Scanning for archetypes in: res/archetypes
+2025-10-14 19:59:38 [INFO] Parsing archetype: cube_base
+2025-10-14 19:59:38 [INFO] Parsing archetype: cube_blue
+2025-10-14 19:59:38 [INFO] Parsing archetype: cube_red
+2025-10-14 19:59:38 [ERROR] cube.color mismatch

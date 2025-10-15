@@ -64,6 +64,11 @@ bool ArchetypeManager::LoadFileToMap(const std::string& filepath) {
     }
     std::filesystem::path p(filepath);
     std::string name = p.stem().string();
+    // Prefer the archetype's tag as the map key when available (so files like cube_base.archetype
+    // that declare tag: cube are stored under 'cube' as tests expect).
+    if (!a.tag.empty()) {
+        name = a.tag;
+    }
     a.source_path = p.string();
     archetypes[name] = a;
     return true;
