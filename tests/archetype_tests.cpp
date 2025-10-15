@@ -4,13 +4,13 @@
 
 int main() {
     Log::Init();
-    Log::Info("running archetype tests");
+    Log::Info("Running archetype tests");
 
     ArchetypeManager::GetInstance().LoadArchetypesFromDirectory("res/archetypes");
     size_t count = ArchetypeManager::GetInstance().GetLoadedCount();
-    std::cout << "loaded archetypes: " << count << std::endl;
+    std::cout << "Loaded archetypes: " << count << std::endl;
     if (count < 3) {
-        Log::Error("expected at least 3 archetypes for tests");
+        Log::Error("Expected at least 3 archetypes for tests");
         return 2;
     }
 
@@ -24,7 +24,7 @@ int main() {
         return 2;
     }
 
-    Log::Info("archetype tests passed");
+    Log::Info("Archetype tests passed");
     Log::Shutdown();
     return 0;
 }
