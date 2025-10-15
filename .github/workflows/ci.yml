@@ -22,3 +22,28 @@ jobs:
 
       - name: Run tests
         run: ./build/archetype_tests
+
+  build-and-test-windows:
+    runs-on: windows-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSYS2 and install mingw-w64 gcc
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: |
+            mingw-w64-x86_64-gcc
+
+      - name: Build archetype tests (Windows)
+        shell: msys2 {0}
+        run: |
+          mkdir -p build
+          g++ -std=c++17 -I. -I./src -I./src/include tests/archetype_tests.cpp src/ArchetypeManager.cpp src/Log.cpp -o build/archetype_tests.exe
+
+      - name: Run tests (Windows)
+        shell: msys2 {0}
+        run: |
+          ./build/archetype_tests.exe
