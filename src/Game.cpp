@@ -144,15 +144,24 @@ void Game::Update() {
     // Update mapped input
     Input::Update();
 
-    // If the window lost focus (Alt+Tab), release the cursor so the OS can use it
+    // If the window lost/gained focus (Alt+Tab), adjust cursor state
     bool focused = IsWindowFocused();
     if (!focused && previousWindowFocused) {
+        // lost focus
+        cursorLockedBeforeFocusLoss = cursorLocked;
         if (cursorLocked) {
             cursorLocked = false;
             EnableCursor();
             GetMouseDelta(); // flush so we don't get a big jump when returning
         } else {
             EnableCursor();
+        }
+    } else if (focused && !previousWindowFocused) {
+        // regained focus
+        if (cursorLockedBeforeFocusLoss) {
+            cursorLocked = true;
+            DisableCursor();
+            GetMouseDelta(); // flush
         }
     }
     previousWindowFocused = focused;
@@ -180,9 +189,16 @@ void Game::Update() {
     // Apply the time scale to the delta time before passing it to other systems
     float scaledDeltaTime = GetFrameTime() * timeScale;
 
-    if (cursorLocked) {
-        UpdateCameraControls(scaledDeltaTime);
+    // Read mouse delta once per frame to avoid jitter
+    Vector2 mouseDelta = { 0.0f, 0.0f };
+    if (cursorLocked && focused) {
+        mouseDelta = GetMouseDelta();
+    } else {
+        // Flush any accumulated movement when unlocked/unfocused
+        GetMouseDelta();
     }
+
+    UpdateCameraControls(scaledDeltaTime, mouseDelta);
 
     EntityManager::GetInstance().UpdateAll(scaledDeltaTime);
 }
@@ -247,11 +263,12 @@ void Game::UpdateCameraControls(float dt) {
     if (Input::IsDown("sprint")) speed *= cameraBoostMultiplier;
 
         // Mouse look: accumulate yaw/pitch
+        // mouseDelta passed in from Update() to avoid multiple reads per frame
         if (cursorLocked) {
-            Vector2 md = GetMouseDelta();
+            Vector2 md = mouseDelta;
             // horizontal
             float hx = md.x * cameraSensitivity;
-            if (!cameraInvertX) hx = -hx; // default behavior: negative delta increases yaw negative
+            if (!cameraInvertX) hx = -hx;
             cameraYaw += hx;
             // vertical
             float vy = -md.y * cameraSensitivity;
