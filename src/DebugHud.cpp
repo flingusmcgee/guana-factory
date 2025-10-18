@@ -1,6 +1,7 @@
 #include "DebugHud.h"
 #include "include/raylib.h"
 #include <sstream>
+#include <cstring>
 
 namespace {
     bool g_visible = false;

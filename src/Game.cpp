@@ -239,7 +239,7 @@ void Game::Shutdown() {
     CloseWindow();
 }
 
-void Game::UpdateCameraControls(float dt) {
+void Game::UpdateCameraControls(float dt, Vector2 mouseDelta) {
     // Read movement from mapped input (camera-relative)
     float mx = 0.0f; // right
     float my = 0.0f; // up
