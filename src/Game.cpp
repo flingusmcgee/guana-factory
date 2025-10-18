@@ -5,6 +5,8 @@
 #include "ArchetypeManager.h"
 #include "Log.h"
 #include "Config.h"
+#include "Input.h"
+#include "DebugHud.h"
 #include <iostream>
 #include <cmath>
 
@@ -51,6 +53,10 @@ void Game::Init() {
     exitRequested = false;
     DisableCursor();
     SetTargetFPS(targetFPS);
+
+    // Input and debug HUD
+    Input::Init();
+    DebugHud::Init();
 
     // Camera setup
     camera.position = { 10.0f, 10.0f, 10.0f };
@@ -113,12 +119,15 @@ void Game::SetTimeScale(float scale) {
 
 // Update game logic
 void Game::Update() {
-    if (IsKeyPressed(KEY_ESCAPE)) {
+    // Update mapped input
+    Input::Update();
+
+    if (Input::WasPressed("quit")) {
         exitRequested = true;
         return;
     }
 
-    if (IsKeyPressed(KEY_TAB)) {
+    if (Input::WasPressed("toggle_cursor")) {
         cursorLocked = !cursorLocked;
         if (cursorLocked) {
             DisableCursor();
@@ -127,6 +136,10 @@ void Game::Update() {
             EnableCursor();
             GetMouseDelta(); // discard delta so camera doesn't jump after unlocking
         }
+    }
+
+    if (Input::WasPressed("debug_toggle")) {
+        DebugHud::Toggle();
     }
 
     // Apply the time scale to the delta time before passing it to other systems
@@ -148,8 +161,9 @@ void Game::Render() {
         DrawGrid(20, 1.0f);
         EntityManager::GetInstance().RenderAll();
     EndMode3D();
-
     DrawFPS(10, 10);
+    // Debug hud
+    DebugHud::Draw(GetFPS(), static_cast<int>(EntityManager::GetInstance().GetLoadedCount()), std::string());
     EndDrawing();
 }
 

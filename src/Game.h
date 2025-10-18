@@ -26,6 +26,7 @@ private:
     float cameraSensitivity = 0.003f;
     bool cursorLocked = true;
     bool exitRequested = false;
+    bool debugHudVisible = false;
 
     // The master time scale for all game logic
     float timeScale = 1.0f;

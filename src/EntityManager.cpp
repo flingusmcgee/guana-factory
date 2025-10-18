@@ -105,3 +105,9 @@ void EntityManager::RenderAll() {
         }
     }
 }
+
+int EntityManager::GetActiveCount() const {
+    int c = 0;
+    for (const auto &e : entity_pool) if (e.is_active) ++c;
+    return c;
+}
