@@ -2,7 +2,6 @@
 #include "Config.h"
 #include "include/raylib.h"
 #include <algorithm>
-#include <sstream>
 
 namespace {
     struct ActionState {
@@ -12,17 +11,21 @@ namespace {
         bool released = false;
     };
 
-    std::map<std::string, ActionState> actions;
+    std::unordered_map<std::string, ActionState> actions;
 
+    // Lightweight split that avoids stringstream and extra allocations
     std::vector<std::string> split(const std::string& s, char sep) {
         std::vector<std::string> out;
-        std::istringstream ss(s);
-        std::string item;
-        while (std::getline(ss, item, sep)) {
+        size_t start = 0;
+        while (start < s.size()) {
+            size_t pos = s.find(sep, start);
+            size_t end = (pos == std::string::npos) ? s.size() : pos;
             // trim
-            size_t a = 0; while (a < item.size() && std::isspace(static_cast<unsigned char>(item[a]))) ++a;
-            size_t b = item.size(); while (b > a && std::isspace(static_cast<unsigned char>(item[b-1]))) --b;
-            if (b > a) out.push_back(item.substr(a, b-a));
+            size_t a = start; while (a < end && std::isspace(static_cast<unsigned char>(s[a]))) ++a;
+            size_t b = end; while (b > a && std::isspace(static_cast<unsigned char>(s[b-1]))) --b;
+            if (b > a) out.emplace_back(s.substr(a, b-a));
+            if (pos == std::string::npos) break;
+            start = pos + 1;
         }
         return out;
     }

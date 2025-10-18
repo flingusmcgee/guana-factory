@@ -60,6 +60,21 @@ void Log::Init() {
 
     try {
         std::filesystem::path logDir(logDirStr);
+        // If a relative log dir would produce a nested build/build when the CWD is already
+        // the build directory (for example when launching build\iguana.exe by double-click),
+        // prefer the parent-directory-based path to avoid build/build/log.
+        if (logDir.is_relative()) {
+            auto candidate = std::filesystem::current_path() / logDir;
+            auto normal = candidate.lexically_normal();
+            std::string s = normal.string();
+            std::string dup = std::string("build") + std::filesystem::path::preferred_separator + "build";
+            if (s.find(dup) != std::string::npos) {
+                // if current path is .../build and logDir starts with build/..., using cwd will make build/build
+                // so use parent_path as the base instead
+                candidate = std::filesystem::current_path().parent_path() / logDir;
+            }
+            logDir = candidate.lexically_normal();
+        }
         if (!std::filesystem::exists(logDir)) std::filesystem::create_directories(logDir);
         std::filesystem::path full = logDir / filename;
         logfile.open(full.string(), std::ios::out | std::ios::trunc);

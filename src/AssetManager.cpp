@@ -3,8 +3,8 @@
 #include <filesystem>
 
 // Define the static maps
-std::map<std::string, Model> AssetManager::models;
-std::map<std::string, Texture2D> AssetManager::textures;
+std::unordered_map<std::string, Model> AssetManager::models;
+std::unordered_map<std::string, Texture2D> AssetManager::textures;
 
 // Load all models and textures from disk
 void AssetManager::LoadAssets() {

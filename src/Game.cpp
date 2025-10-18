@@ -9,8 +9,8 @@
 #include "DebugHud.h"
 #include <iostream>
 #include <cmath>
-#include <sstream>
-#include <iomanip>
+#include <cstdio>
+#include <chrono>
 
 // A temporary function to handle collision events for testing
 void OnCollision(const Event& event) {
@@ -49,9 +49,7 @@ void Game::Init() {
     targetFPS = Config::GetInt("window.target_fps", targetFPS);
 
     InitWindow(screenWidth, screenHeight, winTitle.c_str());
-    cursorLocked = true;
     exitRequested = false;
-    DisableCursor();
 
     // Input and debug HUD
     Input::Init();
@@ -59,6 +57,16 @@ void Game::Init() {
 
     // Track window focus so Alt+Tab releases the cursor
     previousWindowFocused = IsWindowFocused();
+    // Only lock/disable the cursor at startup if the window is actually focused.
+    // This prevents the invisible game window from confining mouse movement
+    // when the user launches the game on another tab.
+    cursorLocked = previousWindowFocused;
+    cursorLockedBeforeFocusLoss = false;
+    if (cursorLocked) {
+        DisableCursor();
+    } else {
+        EnableCursor();
+    }
 
     // Camera setup
     camera.position = { 10.0f, 10.0f, 10.0f };
@@ -142,6 +150,9 @@ void Game::SetTimeScale(float scale) {
 
 // Update game logic
 void Game::Update() {
+    // Profiling: frame start
+    auto frameStart = std::chrono::high_resolution_clock::now();
+
     // Update mapped input
     Input::Update();
 
@@ -190,6 +201,30 @@ void Game::Update() {
     // Apply the time scale to the delta time before passing it to other systems
     float scaledDeltaTime = GetFrameTime() * timeScale;
 
+    // Update debug HUD buffer at a throttled interval
+    debugHudTimer -= GetFrameTime();
+    if (debugHudTimer <= 0.0f) {
+        debugHudTimer = debugHudInterval;
+        // Rebuild the HUD buffer (include profiler timings when enabled)
+        if (profilerEnabled) {
+            debugHudBufLen = std::snprintf(debugHudBuf, sizeof(debugHudBuf),
+                "pos=%.2f,%.2f,%.2f tgt=%.2f,%.2f,%.2f yaw=%.2f pitch=%.2f sens=%.2f | U=%.2f C=%.2f E=%.2f R=%.2f F=%.2fms",
+                camera.position.x, camera.position.y, camera.position.z,
+                camera.target.x, camera.target.y, camera.target.z,
+                cameraYaw, cameraPitch, cameraSensitivity,
+                lastUpdateMs, lastCameraMs, lastEntityMs, lastRenderMs, lastFrameMs);
+        } else {
+            debugHudBufLen = std::snprintf(debugHudBuf, sizeof(debugHudBuf),
+                "pos=%.2f,%.2f,%.2f tgt=%.2f,%.2f,%.2f yaw=%.2f pitch=%.2f sens=%.2f",
+                camera.position.x, camera.position.y, camera.position.z,
+                camera.target.x, camera.target.y, camera.target.z,
+                cameraYaw, cameraPitch, cameraSensitivity);
+        }
+        if (debugHudBufLen < 0) debugHudBufLen = 0;
+        if (debugHudBufLen >= static_cast<int>(sizeof(debugHudBuf))) debugHudBufLen = static_cast<int>(sizeof(debugHudBuf)) - 1;
+        debugHudBuf[debugHudBufLen] = '\0';
+    }
+
     // Read mouse delta once per frame to avoid jitter
     Vector2 mouseDelta = { 0.0f, 0.0f };
     if (cursorLocked && focused) {
@@ -199,13 +234,31 @@ void Game::Update() {
         GetMouseDelta();
     }
 
+    // Profile camera update
+    auto camStart = std::chrono::high_resolution_clock::now();
     UpdateCameraControls(scaledDeltaTime, mouseDelta);
+    auto camEnd = std::chrono::high_resolution_clock::now();
 
+    // Profile entity updates
+    auto entStart = std::chrono::high_resolution_clock::now();
     EntityManager::GetInstance().UpdateAll(scaledDeltaTime);
+    auto entEnd = std::chrono::high_resolution_clock::now();
+
+    // Record timings (milliseconds)
+    if (profilerEnabled) {
+        lastCameraMs = std::chrono::duration<double, std::milli>(camEnd - camStart).count();
+        lastEntityMs = std::chrono::duration<double, std::milli>(entEnd - entStart).count();
+    }
+
+    auto frameEnd = std::chrono::high_resolution_clock::now();
+    if (profilerEnabled) {
+        lastUpdateMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
+    }
 }
 
 // Draw everything to the screen
 void Game::Render() {
+    auto renderStart = std::chrono::high_resolution_clock::now();
     BeginDrawing();
     ClearBackground(SKYBLUE);
 
@@ -214,15 +267,11 @@ void Game::Render() {
         EntityManager::GetInstance().RenderAll();
     EndMode3D();
     DrawFPS(10, 10);
-    // Debug hud (show entity count + camera info)
-    std::stringstream caminfo;
-    caminfo << std::fixed << std::setprecision(2);
-    caminfo << "pos=" << camera.position.x << "," << camera.position.y << "," << camera.position.z << " ";
-    caminfo << "tgt=" << camera.target.x << "," << camera.target.y << "," << camera.target.z << " ";
-    caminfo << "yaw=" << cameraYaw << " pitch=" << cameraPitch << " sens=" << cameraSensitivity;
-    DebugHud::Draw(static_cast<int>(EntityManager::GetInstance().GetActiveCount()), caminfo.str());
+    // Debug hud (throttled) - use cached buffer updated in Update()
+    DebugHud::Draw(static_cast<int>(EntityManager::GetInstance().GetActiveCount()), debugHudBuf);
     // Small origin marker so you can see where (0,0,0) is
-    DrawSphere((Vector3){0.0f, 0.0f, 0.0f}, 0.1f, RED);
+    Vector3 origin = { 0.0f, 0.0f, 0.0f };
+    DrawSphere(origin, 0.1f, RED);
     // Crosshair in the center of the screen
     {
         int cx = screenWidth / 2;
@@ -232,6 +281,11 @@ void Game::Render() {
         DrawCircle(cx, cy, 2, WHITE);
     }
     EndDrawing();
+    auto renderEnd = std::chrono::high_resolution_clock::now();
+    if (profilerEnabled) {
+        lastRenderMs = std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
+        lastFrameMs = lastUpdateMs + lastRenderMs;
+    }
 }
 
 // Unload assets and close the window

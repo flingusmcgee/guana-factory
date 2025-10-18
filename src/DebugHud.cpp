@@ -1,6 +1,6 @@
 #include "DebugHud.h"
 #include "include/raylib.h"
-#include <sstream>
+#include <cstdio>
 #include <cstring>
 
 namespace {
@@ -17,11 +17,13 @@ void DebugHud::Toggle() {
 
 bool DebugHud::Visible() { return g_visible; }
 
-void DebugHud::Draw(int entities, const std::string& extra) {
+void DebugHud::Draw(int entities, const char* extra) {
     if (!g_visible) return;
-    std::stringstream ss;
-    ss << "Entities: " << entities << "\n";
-    if (!extra.empty()) ss << extra << "\n";
-
-    DrawText(ss.str().c_str(), 10, 30, 14, BLACK);
+    char buf[512];
+    int len = std::snprintf(buf, sizeof(buf), "Entities: %d\n", entities);
+    if (extra != nullptr && extra[0] != '\0' && len < static_cast<int>(sizeof(buf) - 1)) {
+        int more = std::snprintf(buf + len, sizeof(buf) - len, "%s\n", extra);
+        if (more > 0) len += more;
+    }
+    DrawText(buf, 10, 30, 14, BLACK);
 }

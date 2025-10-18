@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 // Simple input mapping layer. Actions are strings mapped to one or more keys.
 namespace Input {

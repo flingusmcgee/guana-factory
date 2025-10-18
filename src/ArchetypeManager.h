@@ -4,6 +4,7 @@
 #include <string>
 #include <cstddef>
 #include <map>
+#include <unordered_map>
 #include <unordered_set>
 
 // Manager for loading and accessing archetypes
@@ -27,6 +28,6 @@ private:
     // Internal implementation used to track recursive loads and detect cycles
     Archetype LoadFileInternal(const std::string& filepath, std::unordered_set<std::string>& loading);
     
-    std::map<std::string, Archetype> archetypes;
+    std::unordered_map<std::string, Archetype> archetypes;
     std::string current_directory; // Stores the directory
 };
