@@ -26,7 +26,11 @@ private:
     float cameraSensitivity = 0.003f;
     bool cursorLocked = true;
     bool exitRequested = false;
+    // Camera orientation state for mouse-look
+    float cameraYaw = 0.0f;   // radians
+    float cameraPitch = 0.0f; // radians
     bool debugHudVisible = false;
+         bool previousWindowFocused = true;
 
     // The master time scale for all game logic
     float timeScale = 1.0f;

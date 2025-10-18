@@ -16,10 +16,9 @@ void DebugHud::Toggle() {
 
 bool DebugHud::Visible() { return g_visible; }
 
-void DebugHud::Draw(int fps, int entities, const std::string& extra) {
+void DebugHud::Draw(int entities, const std::string& extra) {
     if (!g_visible) return;
     std::stringstream ss;
-    ss << "FPS: " << fps << "\n";
     ss << "Entities: " << entities << "\n";
     if (!extra.empty()) ss << extra << "\n";
 

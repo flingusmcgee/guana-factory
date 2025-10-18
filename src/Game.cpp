@@ -30,9 +30,7 @@ Game& Game::GetInstance() {
 void Game::Init() {
     int targetFPS = 60;
     // Load configuration (optional)
-    bool cfgLoaded = false;
-    if (Config::Load("config.ini")) cfgLoaded = true;
-    else if (Config::Load("../config.ini")) cfgLoaded = true;
+    if (!Config::Load("config.ini")) Config::Load("../config.ini");
 
     // Apply config-driven debug/time settings
     bool debugEnabled = Config::GetBool("debug.enabled", false);
@@ -52,11 +50,13 @@ void Game::Init() {
     cursorLocked = true;
     exitRequested = false;
     DisableCursor();
-    SetTargetFPS(targetFPS);
 
     // Input and debug HUD
     Input::Init();
     DebugHud::Init();
+
+    // Track window focus so Alt+Tab releases the cursor
+    previousWindowFocused = IsWindowFocused();
 
     // Camera setup
     camera.position = { 10.0f, 10.0f, 10.0f };
@@ -64,6 +64,22 @@ void Game::Init() {
     camera.up = { 0.0f, 1.0f, 0.0f };
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
+
+    // Initialize camera yaw/pitch from initial position->target so we look at the scene
+    {
+        Vector3 dir;
+        dir.x = camera.target.x - camera.position.x;
+        dir.y = camera.target.y - camera.position.y;
+        dir.z = camera.target.z - camera.position.z;
+        float len = std::sqrt(dir.x*dir.x + dir.y*dir.y + dir.z*dir.z);
+        if (len > 1e-6f) {
+            dir.x /= len; dir.y /= len; dir.z /= len;
+            cameraYaw = std::atan2(dir.x, dir.z);
+            cameraPitch = std::asin(dir.y);
+        } else {
+            cameraYaw = 0.0f; cameraPitch = 0.0f;
+        }
+    }
 
     // Load assets and initialize systems
     // Allow the icon path to be configurable
@@ -122,6 +138,19 @@ void Game::Update() {
     // Update mapped input
     Input::Update();
 
+    // If the window lost focus (Alt+Tab), release the cursor so the OS can use it
+    bool focused = IsWindowFocused();
+    if (!focused && previousWindowFocused) {
+        if (cursorLocked) {
+            cursorLocked = false;
+            EnableCursor();
+            GetMouseDelta(); // flush so we don't get a big jump when returning
+        } else {
+            EnableCursor();
+        }
+    }
+    previousWindowFocused = focused;
+
     if (Input::WasPressed("quit")) {
         exitRequested = true;
         return;
@@ -162,8 +191,16 @@ void Game::Render() {
         EntityManager::GetInstance().RenderAll();
     EndMode3D();
     DrawFPS(10, 10);
-    // Debug hud
-    DebugHud::Draw(GetFPS(), static_cast<int>(EntityManager::GetInstance().GetLoadedCount()), std::string());
+    // Debug hud (no FPS here)
+    DebugHud::Draw(static_cast<int>(EntityManager::GetInstance().GetActiveCount()), std::string());
+    // Crosshair in the center of the screen
+    {
+        int cx = screenWidth / 2;
+        int cy = screenHeight / 2;
+        DrawLine(cx - 8, cy, cx + 8, cy, BLACK);
+        DrawLine(cx, cy - 8, cx, cy + 8, BLACK);
+        DrawCircle(cx, cy, 2, WHITE);
+    }
     EndDrawing();
 }
 
@@ -175,28 +212,69 @@ void Game::Shutdown() {
 }
 
 void Game::UpdateCameraControls(float dt) {
-    Vector3 move = { 0.0f, 0.0f, 0.0f };
-    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) move.z += 1.0f;
-    if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) move.z -= 1.0f;
-    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) move.x += 1.0f;
-    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) move.x -= 1.0f;
-    if (IsKeyDown(KEY_SPACE)) move.y += 1.0f;
-    if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) move.y -= 1.0f;
+    // Read movement from mapped input (camera-relative)
+    float mx = 0.0f; // right
+    float my = 0.0f; // up
+    float mz = 0.0f; // forward
 
-    float length = std::sqrt(move.x*move.x + move.y*move.y + move.z*move.z);
-    if (length > 0.0f) {
-        move.x /= length;
-        move.y /= length;
-        move.z /= length;
+    if (Input::IsDown("move_forward")) mz += 1.0f;
+    if (Input::IsDown("move_back")) mz -= 1.0f;
+    if (Input::IsDown("move_right")) mx += 1.0f;
+    if (Input::IsDown("move_left")) mx -= 1.0f;
+    if (Input::IsDown("move_up")) my += 1.0f;
+    if (Input::IsDown("move_down")) my -= 1.0f;
+
+    // Normalize horizontal/forward plane to avoid faster diagonal movement
+    float planarLen = std::sqrt(mx*mx + mz*mz);
+    if (planarLen > 1e-6f) {
+        mx /= planarLen;
+        mz /= planarLen;
     }
 
     float speed = cameraBaseSpeed;
-    if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) speed *= cameraBoostMultiplier;
+    if (Input::IsDown("sprint")) speed *= cameraBoostMultiplier;
 
-    Vector3 scaledMove = { move.x * speed * dt, move.y * speed * dt, move.z * speed * dt };
+        // Mouse look: accumulate yaw/pitch
+        if (cursorLocked) {
+            Vector2 md = GetMouseDelta();
+            // invert horizontal delta so mouse-right turns camera to the right
+            cameraYaw -= md.x * cameraSensitivity;
+            cameraPitch += -md.y * cameraSensitivity;
+            const float pitchLimit = 1.55f;
+            if (cameraPitch > pitchLimit) cameraPitch = pitchLimit;
+            if (cameraPitch < -pitchLimit) cameraPitch = -pitchLimit;
+        }
 
-    Vector2 mouseDelta = GetMouseDelta();
-    Vector3 rotation = { mouseDelta.y * cameraSensitivity, mouseDelta.x * cameraSensitivity, 0.0f };
+        // Build forward vector from yaw/pitch
+        Vector3 forward;
+        forward.x = std::cos(cameraPitch) * std::sin(cameraYaw);
+        forward.y = std::sin(cameraPitch);
+        forward.z = std::cos(cameraPitch) * std::cos(cameraYaw);
+        // normalize forward
+        float flen = std::sqrt(forward.x*forward.x + forward.y*forward.y + forward.z*forward.z);
+        if (flen > 1e-6f) { forward.x /= flen; forward.y /= flen; forward.z /= flen; }
 
-    UpdateCameraPro(&camera, scaledMove, rotation, 0.0f);
+        // right = cross(forward, up) so positive X movement strafes right
+        Vector3 up = { 0.0f, 1.0f, 0.0f };
+        Vector3 right;
+        right.x = forward.y * up.z - forward.z * up.y;
+        right.y = forward.z * up.x - forward.x * up.z;
+        right.z = forward.x * up.y - forward.y * up.x;
+        float rlen = std::sqrt(right.x*right.x + right.y*right.y + right.z*right.z);
+        if (rlen > 1e-6f) { right.x /= rlen; right.y /= rlen; right.z /= rlen; }
+
+        // Movement in world space
+        Vector3 movement = { 0.0f, 0.0f, 0.0f };
+        movement.x = (right.x * mx + up.x * my + forward.x * mz) * speed * dt;
+        movement.y = (right.y * mx + up.y * my + forward.y * mz) * speed * dt;
+        movement.z = (right.z * mx + up.z * my + forward.z * mz) * speed * dt;
+
+        camera.position.x += movement.x;
+        camera.position.y += movement.y;
+        camera.position.z += movement.z;
+
+        // Update target to look along forward
+        camera.target.x = camera.position.x + forward.x;
+        camera.target.y = camera.position.y + forward.y;
+        camera.target.z = camera.position.z + forward.z;
 }
