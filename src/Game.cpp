@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cmath>
 #include <sstream>
+#include <iomanip>
 
 // A temporary function to handle collision events for testing
 void OnCollision(const Event& event) {
@@ -215,6 +216,7 @@ void Game::Render() {
     DrawFPS(10, 10);
     // Debug hud (show entity count + camera info)
     std::stringstream caminfo;
+    caminfo << std::fixed << std::setprecision(2);
     caminfo << "pos=" << camera.position.x << "," << camera.position.y << "," << camera.position.z << " ";
     caminfo << "tgt=" << camera.target.x << "," << camera.target.y << "," << camera.target.z << " ";
     caminfo << "yaw=" << cameraYaw << " pitch=" << cameraPitch << " sens=" << cameraSensitivity;
