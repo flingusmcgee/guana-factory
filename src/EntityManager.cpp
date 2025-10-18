@@ -61,9 +61,11 @@ void EntityManager::UpdateAll(float dt) {
 
     // A second loop
     // This deactivates any entities that were marked for death during the update phase
-    for (auto& entity : entity_pool) {
+    for (size_t i = 0; i < entity_pool.size(); ++i) {
+        auto& entity = entity_pool[i];
         if (entity.is_active && entity.needs_to_die) {
-            entity.is_active = false;
+            entity = Entity();
+            entity.id = static_cast<unsigned int>(i);
         }
     }
 }

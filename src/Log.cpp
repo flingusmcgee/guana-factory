@@ -49,9 +49,10 @@ void Log::Init() {
     std::string defaultLogDir = defaultLogDirPath.string();
     std::string logDirStr = defaultLogDir;
     try {
-        // Config may not be loaded yet; attempt to load a cache by calling Config::Load
-        // (harmless if it's already loaded or missing)
-        Config::Load("config.ini");
+        if (!Config::IsLoaded()) {
+            // Config may not be loaded yet; attempt to load it once
+            Config::Load("config.ini");
+        }
         logDirStr = Config::GetString("log.dir", defaultLogDir);
     } catch (...) {
         logDirStr = defaultLogDir;

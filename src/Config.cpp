@@ -4,6 +4,7 @@
 #include <cctype>
 
 std::unordered_map<std::string, std::string> Config::values;
+bool Config::loaded = false;
 
 std::string Config::trim(const std::string& s) {
     size_t start = 0;
@@ -16,6 +17,7 @@ std::string Config::trim(const std::string& s) {
 bool Config::Load(const std::string& path) {
     std::ifstream f(path);
     if (!f.is_open()) return false;
+    values.clear();
     std::string line;
     while (std::getline(f, line)) {
         line = trim(line);
@@ -26,6 +28,7 @@ bool Config::Load(const std::string& path) {
         std::string value = trim(line.substr(pos + 1));
         values[key] = value;
     }
+    loaded = true;
     return true;
 }
 
@@ -53,4 +56,13 @@ std::string Config::GetString(const std::string& key, const std::string& default
     auto it = values.find(key);
     if (it == values.end()) return defaultValue;
     return it->second;
+}
+
+bool Config::IsLoaded() {
+    return loaded;
+}
+
+void Config::Clear() {
+    values.clear();
+    loaded = false;
 }

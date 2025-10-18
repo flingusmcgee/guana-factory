@@ -13,8 +13,11 @@ public:
     static int GetInt(const std::string& key, int defaultValue);
     static float GetFloat(const std::string& key, float defaultValue);
     static std::string GetString(const std::string& key, const std::string& defaultValue);
+    static bool IsLoaded();
+    static void Clear();
 
 private:
     static std::unordered_map<std::string, std::string> values;
+    static bool loaded;
     static std::string trim(const std::string& s);
 };

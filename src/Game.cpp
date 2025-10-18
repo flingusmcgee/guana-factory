@@ -6,6 +6,7 @@
 #include "Log.h"
 #include "Config.h"
 #include <iostream>
+#include <cmath>
 
 // A temporary function to handle collision events for testing
 void OnCollision(const Event& event) {
@@ -46,6 +47,9 @@ void Game::Init() {
     targetFPS = Config::GetInt("window.target_fps", targetFPS);
 
     InitWindow(screenWidth, screenHeight, winTitle.c_str());
+    cursorLocked = true;
+    exitRequested = false;
+    DisableCursor();
     SetTargetFPS(targetFPS);
 
     // Camera setup
@@ -96,7 +100,7 @@ void Game::Init() {
 
 // The main game loop
 void Game::Run() {
-    while (!WindowShouldClose()) {
+    while (!WindowShouldClose() && !exitRequested) {
         Update();
         Render();
     }
@@ -109,10 +113,29 @@ void Game::SetTimeScale(float scale) {
 
 // Update game logic
 void Game::Update() {
-    UpdateCamera(&camera, CAMERA_FREE); 
-    
+    if (IsKeyPressed(KEY_ESCAPE)) {
+        exitRequested = true;
+        return;
+    }
+
+    if (IsKeyPressed(KEY_TAB)) {
+        cursorLocked = !cursorLocked;
+        if (cursorLocked) {
+            DisableCursor();
+            GetMouseDelta(); // flush accumulated movement when relocking
+        } else {
+            EnableCursor();
+            GetMouseDelta(); // discard delta so camera doesn't jump after unlocking
+        }
+    }
+
     // Apply the time scale to the delta time before passing it to other systems
     float scaledDeltaTime = GetFrameTime() * timeScale;
+
+    if (cursorLocked) {
+        UpdateCameraControls(scaledDeltaTime);
+    }
+
     EntityManager::GetInstance().UpdateAll(scaledDeltaTime);
 }
 
@@ -133,5 +156,33 @@ void Game::Render() {
 // Unload assets and close the window
 void Game::Shutdown() {
     AssetManager::UnloadAssets();
+    EnableCursor();
     CloseWindow();
+}
+
+void Game::UpdateCameraControls(float dt) {
+    Vector3 move = { 0.0f, 0.0f, 0.0f };
+    if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) move.z += 1.0f;
+    if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) move.z -= 1.0f;
+    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) move.x += 1.0f;
+    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) move.x -= 1.0f;
+    if (IsKeyDown(KEY_SPACE)) move.y += 1.0f;
+    if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) move.y -= 1.0f;
+
+    float length = std::sqrt(move.x*move.x + move.y*move.y + move.z*move.z);
+    if (length > 0.0f) {
+        move.x /= length;
+        move.y /= length;
+        move.z /= length;
+    }
+
+    float speed = cameraBaseSpeed;
+    if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) speed *= cameraBoostMultiplier;
+
+    Vector3 scaledMove = { move.x * speed * dt, move.y * speed * dt, move.z * speed * dt };
+
+    Vector2 mouseDelta = GetMouseDelta();
+    Vector3 rotation = { mouseDelta.y * cameraSensitivity, mouseDelta.x * cameraSensitivity, 0.0f };
+
+    UpdateCameraPro(&camera, scaledMove, rotation, 0.0f);
 }

@@ -36,6 +36,8 @@ void AssetManager::UnloadAssets() {
     for (auto const& [id, texture] : textures) {
         UnloadTexture(texture);
     }
+    models.clear();
+    textures.clear();
 }
 
 // Get a loaded model by its ID

@@ -33,11 +33,7 @@ void ArchetypeManager::LoadArchetypesFromDirectory(const std::string& directoryP
         const char* path = files.paths[i];
         if (IsFileExtension(path, ".archetype")) {
             std::filesystem::path p(path);
-            std::string name = p.stem().string();
-            // Check prevents reloading an archetype that was already loaded as a parent
-            if (archetypes.find(name) == archetypes.end()) {
-                LoadFileToMap(p.string());
-            }
+            LoadFileToMap(p.string());
         }
     }
     UnloadDirectoryFiles(files);
@@ -64,21 +60,36 @@ bool ArchetypeManager::LoadFileToMap(const std::string& filepath) {
         return false;
     }
     std::filesystem::path p(filepath);
-    std::string name = p.stem().string();
+    std::filesystem::path normalized = std::filesystem::absolute(p).lexically_normal();
+    std::string mapKey = normalized.stem().string();
+
     // Prefer the archetype's tag as the map key when available (so files like cube_base.archetype
     // that declare tag: cube are stored under 'cube')
     if (!a.tag.empty()) {
-        name = a.tag;
+        mapKey = a.tag;
     }
-    a.source_path = p.string();
-    archetypes[name] = a;
+
+    a.source_path = normalized.string();
+
+    auto existing = archetypes.find(mapKey);
+    if (existing != archetypes.end()) {
+        if (existing->second.source_path == a.source_path) {
+            archetypes[mapKey] = a;
+        } else {
+            Log::Warning("Skipping archetype '" + mapKey + "' from '" + a.source_path + "' because a different archetype with the same key already exists from '" + existing->second.source_path + "'");
+            return false;
+        }
+    } else {
+        archetypes[mapKey] = a;
+    }
     return true;
 }
 
 // Internal implementation with cycle detection
 Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::unordered_set<std::string>& loading) {
     std::filesystem::path p(filepath);
-    std::string filepathStr = p.string();
+    std::filesystem::path normalized = std::filesystem::absolute(p).lexically_normal();
+    std::string filepathStr = normalized.string();
 
     std::ifstream file(filepathStr);
     if (!file.is_open()) {
@@ -90,8 +101,8 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
     Log::Info("Parsing archetype: " + name);
 
     // If we're already loading this archetype, abort to avoid cycles
-    if (loading.find(name) != loading.end()) {
-        Log::Error("Detected cyclic inheritance while loading: " + name);
+    if (loading.find(filepathStr) != loading.end()) {
+        Log::Error("Detected cyclic inheritance while loading: " + filepathStr);
         return Archetype();
     }
 
@@ -177,7 +188,7 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
     file.close();
 
     // Now perform loading/merging. Mark this archetype as loading
-    loading.insert(name);
+    loading.insert(filepathStr);
 
     Archetype result;
     // If we have a parent, try to load it (search in same directory as this file)
@@ -214,8 +225,10 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
         result.populated = true;
     }
 
+    result.source_path = filepathStr;
+
     // Finished loading this archetype
-    loading.erase(name);
+    loading.erase(filepathStr);
 
     archetypes[name] = result;
     return result;
