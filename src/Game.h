@@ -31,6 +31,8 @@ private:
     float cameraPitch = 0.0f; // radians
     bool debugHudVisible = false;
          bool previousWindowFocused = true;
+    bool cameraInvertX = false;
+    bool cameraInvertY = false;
 
     // The master time scale for all game logic
     float timeScale = 1.0f;

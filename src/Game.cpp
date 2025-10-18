@@ -9,6 +9,7 @@
 #include "DebugHud.h"
 #include <iostream>
 #include <cmath>
+#include <sstream>
 
 // A temporary function to handle collision events for testing
 void OnCollision(const Event& event) {
@@ -80,6 +81,11 @@ void Game::Init() {
             cameraYaw = 0.0f; cameraPitch = 0.0f;
         }
     }
+
+    // Read camera settings from config (sensitivity and inversion)
+    cameraSensitivity = Config::GetFloat("camera.sensitivity", cameraSensitivity);
+    cameraInvertX = Config::GetBool("camera.invert_x", cameraInvertX);
+    cameraInvertY = Config::GetBool("camera.invert_y", cameraInvertY);
 
     // Load assets and initialize systems
     // Allow the icon path to be configurable
@@ -191,8 +197,14 @@ void Game::Render() {
         EntityManager::GetInstance().RenderAll();
     EndMode3D();
     DrawFPS(10, 10);
-    // Debug hud (no FPS here)
-    DebugHud::Draw(static_cast<int>(EntityManager::GetInstance().GetActiveCount()), std::string());
+    // Debug hud (show entity count + camera info)
+    std::stringstream caminfo;
+    caminfo << "pos=" << camera.position.x << "," << camera.position.y << "," << camera.position.z << " ";
+    caminfo << "tgt=" << camera.target.x << "," << camera.target.y << "," << camera.target.z << " ";
+    caminfo << "yaw=" << cameraYaw << " pitch=" << cameraPitch << " sens=" << cameraSensitivity;
+    DebugHud::Draw(static_cast<int>(EntityManager::GetInstance().GetActiveCount()), caminfo.str());
+    // Small origin marker so you can see where (0,0,0) is
+    DrawSphere((Vector3){0.0f, 0.0f, 0.0f}, 0.1f, RED);
     // Crosshair in the center of the screen
     {
         int cx = screenWidth / 2;
@@ -237,9 +249,14 @@ void Game::UpdateCameraControls(float dt) {
         // Mouse look: accumulate yaw/pitch
         if (cursorLocked) {
             Vector2 md = GetMouseDelta();
-            // invert horizontal delta so mouse-right turns camera to the right
-            cameraYaw -= md.x * cameraSensitivity;
-            cameraPitch += -md.y * cameraSensitivity;
+            // horizontal
+            float hx = md.x * cameraSensitivity;
+            if (!cameraInvertX) hx = -hx; // default behavior: negative delta increases yaw negative
+            cameraYaw += hx;
+            // vertical
+            float vy = -md.y * cameraSensitivity;
+            if (cameraInvertY) vy = -vy;
+            cameraPitch += vy;
             const float pitchLimit = 1.55f;
             if (cameraPitch > pitchLimit) cameraPitch = pitchLimit;
             if (cameraPitch < -pitchLimit) cameraPitch = -pitchLimit;
