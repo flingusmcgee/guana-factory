@@ -1,8 +1,5 @@
 // Not my code
 
-#include "include/raylib.h"
-#include <filesystem>
-#include <vector>
 #include <string>
 #include <cstring>
 #include <cstdlib>
@@ -20,14 +17,11 @@ static char *alloc_cstr(const std::string &s) {
     return p;
 }
 
-// Only provide stubs if RAYLIB_STUBS is explicitly enabled. When linking the
-// full raylib library (e.g. lib/libraylib.a) these symbols are already
-// provided and defining the stubs would cause multiple definition errors
 #if defined(RAYLIB_STUBS)
+#include "include/raylib.h"
+#include <filesystem>
+#include <vector>
 extern "C" {
-
-bool IsFileExtension(const char *fileName, const char *ext) {
-    if (!fileName || !ext) return false;
     std::string f = to_lower(std::string(fileName));
     std::string e = to_lower(std::string(ext));
     if (e.size() == 0) return true;

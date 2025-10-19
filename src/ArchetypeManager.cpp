@@ -4,7 +4,7 @@
 #include <fstream>
 #include <string>
 #include <cctype>
-#include <filesystem>
+// <algorithm> removed because it's not needed and causes editor warnings
 
 // Provide a single, global instance
 ArchetypeManager& ArchetypeManager::GetInstance() {
@@ -32,8 +32,12 @@ void ArchetypeManager::LoadArchetypesFromDirectory(const std::string& directoryP
     for (unsigned int i = 0; i < files.count; i++) {
         const char* path = files.paths[i];
         if (IsFileExtension(path, ".archetype")) {
-            std::filesystem::path p(path);
-            LoadFileToMap(p.string());
+            // LoadDirectoryFiles may return paths that already include the directory prefix
+            // so extract the filename portion to avoid double-prefixing later.
+            std::string full(path);
+            size_t pos = full.find_last_of("/\\");
+            std::string filename = (pos == std::string::npos) ? full : full.substr(pos + 1);
+            LoadFileToMap(filename);
         }
     }
     UnloadDirectoryFiles(files);
@@ -59,9 +63,8 @@ bool ArchetypeManager::LoadFileToMap(const std::string& filepath) {
     if (a.isEmpty()) {
         return false;
     }
-    std::filesystem::path p(filepath);
-    std::filesystem::path normalized = std::filesystem::absolute(p).lexically_normal();
-    std::string mapKey = normalized.stem().string();
+    // Use lightweight filename extraction to avoid relying on std::filesystem
+    std::string mapKey = GetFileNameWithoutExt(filepath.c_str());
 
     // Prefer the archetype's tag as the map key when available (so files like cube_base.archetype
     // that declare tag: cube are stored under 'cube')
@@ -69,7 +72,7 @@ bool ArchetypeManager::LoadFileToMap(const std::string& filepath) {
         mapKey = a.tag;
     }
 
-    a.source_path = normalized.string();
+    a.source_path = filepath;
 
     auto existing = archetypes.find(mapKey);
     if (existing != archetypes.end()) {
@@ -87,9 +90,28 @@ bool ArchetypeManager::LoadFileToMap(const std::string& filepath) {
 
 // Internal implementation with cycle detection
 Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::unordered_set<std::string>& loading) {
-    std::filesystem::path p(filepath);
-    std::filesystem::path normalized = std::filesystem::absolute(p).lexically_normal();
-    std::string filepathStr = normalized.string();
+    // Resolve relative paths against the last scanned directory. Keep this simple
+    // to avoid depending on std::filesystem which may not be available to
+    // editor tooling / IntelliSense.
+    std::string filepathStr = filepath;
+    // If the path isn't absolute, prefix with current_directory
+    auto isAbsolute = [](const std::string &s)->bool {
+        if (s.empty()) return false;
+        // Windows drive letter, e.g. C:\ or UNC paths starting with \\\
+        if (s.size() > 1 && s[1] == ':') return true;
+        if (s[0] == '/' || s[0] == '\\') return true;
+        return false;
+    };
+    if (!isAbsolute(filepathStr) && !current_directory.empty()) {
+        // If the filepath already contains a directory portion, assume it's either
+        // relative to current CWD or intentionally prefixed; only prefix when the
+        // filepath is a simple filename without separators.
+        if (filepathStr.find_first_of("/\\") == std::string::npos) {
+            std::string sep = "/";
+            if (!current_directory.empty() && (current_directory.back() == '/' || current_directory.back() == '\\')) sep = "";
+            filepathStr = current_directory + sep + filepathStr;
+        }
+    }
 
     std::ifstream file(filepathStr);
     if (!file.is_open()) {
@@ -134,9 +156,11 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
 
         if (key == "inherits") {
             parentName = value;
+        } else if (key == "tag") {
+            child.tag = value; flags.tag = true; child.populated = true;
+        } else if (key == "model_id") {
+            child.model_id = value; flags.model_id = true; child.populated = true;
         }
-    else if (key == "tag") { child.tag = value; flags.tag = true; child.populated = true; }
-    else if (key == "model_id") { child.model_id = value; flags.model_id = true; child.populated = true; }
         else if (key == "color_r") {
             try {
                 child.color.r = static_cast<unsigned char>(std::stoi(value));
@@ -197,11 +221,14 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
         if (archetypes.find(parentName) != archetypes.end()) {
             result = archetypes.at(parentName);
         } else {
-            std::filesystem::path parentPath = p.parent_path() / (parentName + ".archetype");
+            // Compute parent path by joining directory of filepathStr with the parent name
+            size_t pos = filepathStr.find_last_of("/\\");
+            std::string dir = (pos == std::string::npos) ? std::string() : filepathStr.substr(0, pos);
+            std::string parentPath = dir.empty() ? (parentName + ".archetype") : (dir + "/" + parentName + ".archetype");
             // Attempt to load the parent; if it fails, log the attempted path for easier debugging
-            Archetype parent = LoadFileInternal(parentPath.string(), loading);
+            Archetype parent = LoadFileInternal(parentPath, loading);
             if (parent.isEmpty()) {
-                Log::Error("Failed to load parent archetype '" + parentName + "' for child '" + name + "'. Tried path: " + parentPath.string());
+                Log::Error("Failed to load parent archetype '" + parentName + "' for child '" + name + "'. Tried path: " + parentPath);
             }
             result = parent;
         }

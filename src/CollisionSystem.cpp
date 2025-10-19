@@ -1,9 +1,9 @@
 #include "CollisionSystem.h"
 #include "EventManager.h"
-#include <string>
 #include <cstdint>
 #include <cmath>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // Spatial hash broad-phase parameters
@@ -18,6 +18,12 @@ static inline int64_t CellKey(int x, int y) {
 void CollisionSystem::CheckCollisions(std::vector<Entity>& entities) {
     std::unordered_map<int64_t, std::vector<size_t>> buckets;
     buckets.reserve(entities.size() * 2);
+
+    // Track active collision pairs across frames to avoid spamming the same
+    // collision event while two entities remain in contact.
+    // We use a static set so state persists between calls.
+    static std::unordered_set<uint64_t> activePairs;
+    std::unordered_set<uint64_t> currentFramePairs;
 
     // Insert entities into buckets based on their AABB centers
     for (size_t i = 0; i < entities.size(); ++i) {
@@ -55,14 +61,35 @@ void CollisionSystem::CheckCollisions(std::vector<Entity>& entities) {
                         if (i >= j) continue; // avoid duplicate checks and self
                         if (!entities[i].is_active || !entities[j].is_active) continue;
                         if (CheckCollisionBoxes(entities[i].bounds, entities[j].bounds)) {
-                            CollisionEvent event;
-                            event.entityA = &entities[i];
-                            event.entityB = &entities[j];
-                            EventManager::GetInstance().FireEvent(event);
+                            // Build a symmetric pair key (min<<32 | max)
+                            uint32_t a = static_cast<uint32_t>(entities[i].id);
+                            uint32_t b = static_cast<uint32_t>(entities[j].id);
+                            uint32_t lo = (a < b) ? a : b;
+                            uint32_t hi = (a < b) ? b : a;
+                            uint64_t pairKey = (static_cast<uint64_t>(lo) << 32) | hi;
+                            currentFramePairs.insert(pairKey);
+
+                            // Only fire event if this pair was not colliding last frame
+                            if (activePairs.find(pairKey) == activePairs.end()) {
+                                CollisionEvent event;
+                                event.entityA = &entities[i];
+                                event.entityB = &entities[j];
+                                EventManager::GetInstance().FireEvent(event);
+                                activePairs.insert(pairKey);
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+
+    // Remove pairs that are no longer colliding
+    for (auto it = activePairs.begin(); it != activePairs.end(); ) {
+        if (currentFramePairs.find(*it) == currentFramePairs.end()) {
+            it = activePairs.erase(it);
+        } else {
+            ++it;
         }
     }
 }

@@ -4,8 +4,14 @@
 #include <ctime>
 #include <string>
 #include <mutex>
-#include <filesystem>
 #include "Config.h"
+// Platform mkdir
+#if defined(_WIN32) || defined(_WIN64)
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 // Define the static logfile member
 std::ofstream Log::logfile;
@@ -45,8 +51,8 @@ void Log::Init() {
     std::string filename = "iguana - " + timestamp + ".log";
 
     // Allow overriding the log directory from config
-    std::filesystem::path defaultLogDirPath = std::filesystem::path("build") / "log";
-    std::string defaultLogDir = defaultLogDirPath.string();
+    // Avoid std::filesystem to keep editor/tooling happy; use a simple string path
+    std::string defaultLogDir = "build/log";
     std::string logDirStr = defaultLogDir;
     try {
         if (!Config::IsLoaded()) {
@@ -59,27 +65,46 @@ void Log::Init() {
     }
 
     try {
-        std::filesystem::path logDir(logDirStr);
-        // If a relative log dir would produce a nested build/build when the CWD is already
-        // the build directory (for example when launching build\iguana.exe by double-click),
-        // prefer the parent-directory-based path to avoid build/build/log.
-        if (logDir.is_relative()) {
-            auto candidate = std::filesystem::current_path() / logDir;
-            auto normal = candidate.lexically_normal();
-            std::string s = normal.string();
-            std::string dup = std::string("build") + std::filesystem::path::preferred_separator + "build";
-            if (s.find(dup) != std::string::npos) {
-                // if current path is .../build and logDir starts with build/..., using cwd will make build/build
-                // so use parent_path as the base instead
-                candidate = std::filesystem::current_path().parent_path() / logDir;
+        // Ensure the directory exists (create recursively if needed) so the
+        // logfile is created under the intended folder instead of the current
+        // working directory.
+        auto make_dirs = [](const std::string &path) {
+            if (path.empty()) return;
+            // Normalize separators to '/'
+            std::string p = path;
+            for (char &c : p) if (c == '\\') c = '/';
+            // Remove trailing slash
+            if (!p.empty() && p.back() == '/') p.pop_back();
+            size_t pos = 0;
+            while (true) {
+                size_t next = p.find('/', pos);
+                std::string sub = (next == std::string::npos) ? p : p.substr(0, next);
+                if (!sub.empty()) {
+#if defined(_WIN32) || defined(_WIN64)
+                    _mkdir(sub.c_str());
+#else
+                    mkdir(sub.c_str(), 0755);
+#endif
+                }
+                if (next == std::string::npos) break;
+                pos = next + 1;
             }
-            logDir = candidate.lexically_normal();
+        };
+
+        std::string fullPath = logDirStr;
+        if (!fullPath.empty() && fullPath.back() != '/' && fullPath.back() != '\\') fullPath += "/";
+        // Create the directory tree
+        if (!logDirStr.empty()) make_dirs(logDirStr);
+        fullPath += filename;
+
+        // Attempt to open the file at the requested location; if that fails,
+        // fall back to the current directory.
+        logfile.open(fullPath, std::ios::out | std::ios::trunc);
+        if (!logfile.is_open()) {
+            logfile.open(filename, std::ios::out | std::ios::trunc);
         }
-        if (!std::filesystem::exists(logDir)) std::filesystem::create_directories(logDir);
-        std::filesystem::path full = logDir / filename;
-        logfile.open(full.string(), std::ios::out | std::ios::trunc);
     } catch (...) {
-        // fallback to current directory if filesystem operations fail
+        // fallback to current directory if anything unexpected happens
         logfile.open(filename, std::ios::out | std::ios::trunc);
     }
 
