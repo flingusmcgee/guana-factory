@@ -97,7 +97,7 @@ Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::u
     // If the path isn't absolute, prefix with current_directory
     auto isAbsolute = [](const std::string &s)->bool {
         if (s.empty()) return false;
-        // Windows drive letter, e.g. C:\ or UNC paths starting with \\\
+        // Windows drive letter, e.g. C:\\ or UNC paths starting with \\ (escaped in a C++ string)
         if (s.size() > 1 && s[1] == ':') return true;
         if (s[0] == '/' || s[0] == '\\') return true;
         return false;

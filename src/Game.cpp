@@ -7,19 +7,20 @@
 #include "Config.h"
 #include "Input.h"
 #include "DebugHud.h"
-#include <iostream>
 #include <cmath>
 #include <cstdio>
 #include <chrono>
 
-// A temporary function to handle collision events for testing
+// Collision event handler — use Log so level can be controlled via config
 void OnCollision(const Event& event) {
     const CollisionEvent& collision = static_cast<const CollisionEvent&>(event);
-
-    // Placeholder: print entity IDs to console
-    std::cout << "WOAH: Collision Detected!" << std::endl;
-    std::cout << "EntityA ID: " << collision.entityA->id << std::endl;
-    std::cout << "EntityB ID: " << collision.entityB->id << std::endl;
+    bool debugCollisions = Config::GetBool("debug.collision_logs", false);
+    // The collision system already de-duplicates pairs; log at Info if the
+    // user explicitly enabled collision debug, otherwise keep it at Debug.
+    std::string msg = "Collision: A=" + std::to_string(collision.entityA->id)
+        + " B=" + std::to_string(collision.entityB->id);
+    if (debugCollisions) Log::Info(msg);
+    else Log::Warning(msg); // keep visible but less spammy than repeated cout
 }
 
 // Provide a single, global instance of the game
