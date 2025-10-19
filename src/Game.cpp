@@ -5,6 +5,7 @@
 #include "ArchetypeManager.h"
 #include "Log.h"
 #include "Config.h"
+#include "SystemManager.h"
 #include "Input.h"
 #include "DebugHud.h"
 #include <cmath>
@@ -100,6 +101,8 @@ void Game::Init() {
     // Load assets and initialize systems
     // Allow the icon path to be configurable
     AssetManager::LoadAssets();
+    // Initialize registered systems
+    SystemManager::GetInstance().InitAll();
     // Try a couple of likely archetype paths (executable working directory may vary)
     // Archetype paths: support a comma-separated list in config
     std::string apaths = Config::GetString("archetypes.paths", "res/archetypes,../res/archetypes");
@@ -245,6 +248,9 @@ void Game::Update() {
     EntityManager::GetInstance().UpdateAll(scaledDeltaTime);
     auto entEnd = std::chrono::high_resolution_clock::now();
 
+    // Update systems
+    SystemManager::GetInstance().UpdateAll(scaledDeltaTime);
+
     // Record timings (milliseconds)
     if (profilerEnabled) {
         lastCameraMs = std::chrono::duration<double, std::milli>(camEnd - camStart).count();
@@ -292,6 +298,7 @@ void Game::Render() {
 // Unload assets and close the window
 void Game::Shutdown() {
     AssetManager::UnloadAssets();
+    SystemManager::GetInstance().ShutdownAll();
     EnableCursor();
     CloseWindow();
 }

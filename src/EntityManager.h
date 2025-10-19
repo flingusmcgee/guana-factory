@@ -24,6 +24,7 @@ public:
 private:
     EntityManager() {}
     std::vector<Entity> entity_pool;
+    int active_count = 0;
 
     // Instances of the core gameplay systems
     PhysicsSystem physicsSystem;

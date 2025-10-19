@@ -48,6 +48,7 @@ $srcFiles = @(
     'src/Input.cpp',
     'src/DebugHud.cpp',
     'src/PhysicsSystem.cpp',
+    'src/SystemManager.cpp',
     'src/CollisionSystem.cpp',
     'src/Log.cpp',
     'src/ArchetypeManager.cpp'

@@ -16,27 +16,26 @@ static inline int64_t CellKey(int x, int y) {
 
 // Check all active entities for collisions and fire events using spatial hashing
 void CollisionSystem::CheckCollisions(std::vector<Entity>& entities) {
-    std::unordered_map<int64_t, std::vector<size_t>> buckets;
+    static std::unordered_map<int64_t, std::vector<size_t>> buckets;
+    buckets.clear();
     buckets.reserve(entities.size() * 2);
 
     // Track active collision pairs across frames to avoid spamming the same
     // collision event while two entities remain in contact.
-    // We use a static set so state persists between calls.
     static std::unordered_set<uint64_t> activePairs;
     std::unordered_set<uint64_t> currentFramePairs;
 
     // Insert entities into buckets based on their AABB centers
     for (size_t i = 0; i < entities.size(); ++i) {
         if (!entities[i].is_active) continue;
-        Vector3 c = {
-            (entities[i].bounds.min.x + entities[i].bounds.max.x) * 0.5f,
-            (entities[i].bounds.min.y + entities[i].bounds.max.y) * 0.5f,
-            (entities[i].bounds.min.z + entities[i].bounds.max.z) * 0.5f
-        };
-        int cellX = static_cast<int>(std::floor(c.x / CELL_SIZE));
-        int cellZ = static_cast<int>(std::floor(c.z / CELL_SIZE));
+        float cx = (entities[i].bounds.min.x + entities[i].bounds.max.x) * 0.5f;
+        float cz = (entities[i].bounds.min.z + entities[i].bounds.max.z) * 0.5f;
+        int cellX = static_cast<int>(std::floor(cx / CELL_SIZE));
+        int cellZ = static_cast<int>(std::floor(cz / CELL_SIZE));
         int64_t key = CellKey(cellX, cellZ);
-        buckets[key].push_back(i);
+        auto &vec = buckets[key];
+        if (vec.capacity() == 0) vec.reserve(4);
+        vec.push_back(i);
     }
 
     // For each occupied cell, test entities within the cell and neighboring cells
