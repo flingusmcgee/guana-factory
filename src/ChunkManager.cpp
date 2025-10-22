@@ -84,73 +84,9 @@ namespace ChunkManager {
                 if (ch->hasModel) {
                     // Draw the chunk model; place it at chunk origin
                     Vector3 origin = { static_cast<float>(ch->GetCoord().x * S), static_cast<float>(ch->GetCoord().y * S), static_cast<float>(ch->GetCoord().z * S) };
-                    // Ensure the chunk model's material is bound to the atlas at draw time (override stale state)
-                    try {
-                        Texture2D &atlas = AssetManager::GetTexture("atlas");
-                        if (ch->model.materialCount > 0) {
-                            SetMaterialTexture(&ch->model.materials[0], MATERIAL_MAP_ALBEDO, atlas);
-                            SetMaterialTexture(&ch->model.materials[0], MATERIAL_MAP_DIFFUSE, atlas);
-                            ch->model.materials[0].maps[MATERIAL_MAP_ALBEDO].color = WHITE;
-                            {
-                                auto c = ch->GetCoord();
-                                Log::Info(std::string("ChunkManager: bound atlas to chunk model at ") + std::to_string(c.x) + "," + std::to_string(c.y) + "," + std::to_string(c.z));
-                            }
-                        }
-                    } catch (...) {}
+                    // Draw the chunk model as-is. We intentionally avoid binding any atlas texture here
+                    // so the rendering path remains the same as prior to adding per-block texture plumbing.
                     DrawModel(ch->model, origin, 1.0f, WHITE);
-                    // DEBUG: draw a billboarded atlas texture at the chunk center so we can verify texturing per-chunk
-                    Vector3 center = { origin.x + S*0.5f, origin.y + S*0.5f, origin.z + S*0.5f };
-                    try {
-                        Texture2D &atlas = AssetManager::GetTexture("atlas");
-                        Rectangle src = { 0.0f, 0.0f, static_cast<float>(atlas.width), static_cast<float>(atlas.height) };
-                        Vector2 dstSize = { 0.6f, 0.6f };
-                        DrawBillboardRec((Camera&)cam, atlas, src, center, dstSize, WHITE);
-                    } catch (...) {
-                        // fallback to magenta sphere when atlas not available
-                        DrawSphere(center, 0.15f, MAGENTA);
-                    }
-
-                    // One-time test: draw a billboarded textured quad at the first chunk center to ensure texturing works
-                    if (!drawnTestPlane) {
-                        drawnTestPlane = true;
-                        try {
-                            Texture2D &atlas = AssetManager::GetTexture("atlas");
-                            // source rect covers the whole texture; destination size set to chunk-size in world units
-                            Rectangle src = { 0.0f, 0.0f, static_cast<float>(atlas.width), static_cast<float>(atlas.height) };
-                            Vector2 dstSize = { static_cast<float>(S), static_cast<float>(S) };
-                            Vector3 pos = { origin.x + S*0.5f, origin.y + 0.5f, origin.z + S*0.5f };
-                            DrawBillboardRec((Camera&)cam, atlas, src, pos, dstSize, WHITE);
-                            Log::Info(std::string("TestBillboard: drawn atlas at chunk center pos=(") + std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z) + ")");
-                        } catch (...) {
-                            // ignore
-                        }
-                    }
-
-                    // One-time test: create a simple GenMeshCube model, bind atlas to it and draw next to the chunk
-                    static bool drawnTestModel = false;
-                    if (!drawnTestModel) {
-                        drawnTestModel = true;
-                        try {
-                            Texture2D &atlas = AssetManager::GetTexture("atlas");
-                            Mesh cubeMesh = GenMeshCube(1.0f, 1.0f, 1.0f);
-                            Model cubeModel = LoadModelFromMesh(cubeMesh);
-                            UnloadMesh(cubeMesh);
-                            if (cubeModel.materialCount > 0) {
-                                SetMaterialTexture(&cubeModel.materials[0], MATERIAL_MAP_ALBEDO, atlas);
-                                SetMaterialTexture(&cubeModel.materials[0], MATERIAL_MAP_DIFFUSE, atlas);
-                                cubeModel.materials[0].maps[MATERIAL_MAP_ALBEDO].color = WHITE;
-                                int mid = cubeModel.materials[0].maps[MATERIAL_MAP_ALBEDO].texture.id;
-                                int sid = static_cast<int>(cubeModel.materials[0].shader.id);
-                                Log::Info(std::string("TestModel: cubeModel material shader=") + std::to_string(sid) + " tex=" + std::to_string(mid));
-                            }
-                            // draw it slightly above the chunk origin for visibility
-                            Vector3 testPos = { origin.x + S + 1.5f, origin.y + 0.5f, origin.z + 0.0f };
-                            DrawModel(cubeModel, testPos, 1.0f, WHITE);
-                            UnloadModel(cubeModel);
-                        } catch (...) {
-                            Log::Info("TestModel: failed to create/draw cubeModel");
-                        }
-                    }
                 } else {
                     bool any = false;
                     for (int x = 0; x < S && !any; ++x) for (int y = 0; y < S && !any; ++y) for (int z = 0; z < S; ++z) if (ch->Get(x,y,z) != 0) { any = true; break; }

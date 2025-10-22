@@ -173,9 +173,10 @@ bool GreedyMesher::MeshChunk(Chunk& chunk, std::function<BlockId(int,int,int)> n
                     bool flip = ( (m < 0) );
                     int faceSign = (m > 0) ? 1 : -1;
                     BlockId bid = static_cast<BlockId>( (m > 0) ? m : -m );
-                    // faceIndex: encode axis*2 + (faceSign==1?0:1) -> 0..5
+                    // faceIndex omitted: we no longer consult an atlas for per-face UVs.
+                    // Use a neutral/default uvrect so generated meshes keep a consistent (blank) UV layout.
                     int faceIndex = axis * 2 + (faceSign == 1 ? 0 : 1);
-                    Rectangle uvrect = AssetManager::GetBlockFaceUV(bid, faceIndex);
+                    Rectangle uvrect = { 0.0f, 0.0f, 0.0f, 0.0f };
                     PushQuad(verts, normals, uvs, indices, wx[0], wy[0], wz[0], wx[1], wy[1], wz[1], wx[2], wy[2], wz[2], wx[3], wy[3], wz[3], nxn, nyn, nzn, uvrect, flip);
 
                     // zero out mask for area
