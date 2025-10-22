@@ -177,6 +177,8 @@ bool GreedyMesher::MeshChunk(Chunk& chunk, std::function<BlockId(int,int,int)> n
                     // Use a neutral/default uvrect so generated meshes keep a consistent (blank) UV layout.
                     int faceIndex = axis * 2 + (faceSign == 1 ? 0 : 1);
                     Rectangle uvrect = { 0.0f, 0.0f, 0.0f, 0.0f };
+                    // silence -Wunused-variable for variables kept for future plumbing
+                    (void)bid; (void)faceIndex;
                     PushQuad(verts, normals, uvs, indices, wx[0], wy[0], wz[0], wx[1], wy[1], wz[1], wx[2], wy[2], wz[2], wx[3], wy[3], wz[3], nxn, nyn, nzn, uvrect, flip);
 
                     // zero out mask for area
@@ -272,42 +274,10 @@ bool GreedyMesher::MeshChunk(Chunk& chunk, std::function<BlockId(int,int,int)> n
         }
     } catch (...) {}
 
-    // If an atlas texture exists, assign it to the model's first material and ensure
-    // the model uses the default shader so UVs are sampled normally.
-    try {
-        Texture2D &atlas = AssetManager::GetTexture("atlas");
-        if (model.materialCount > 0) {
-            // Assign atlas to the material maps (aliasing for raylib variations)
-            SetMaterialTexture(&model.materials[0], MATERIAL_MAP_DIFFUSE, atlas);
-            SetMaterialTexture(&model.materials[0], MATERIAL_MAP_ALBEDO, atlas);
-            // Ensure the material map color is neutral (white) so texture appears as-is
-            model.materials[0].maps[MATERIAL_MAP_ALBEDO].color = WHITE;
-            std::string msg = std::string("GreedyMesher: bound atlas texture id=") + std::to_string(atlas.id) + " to model (materials=" + std::to_string(model.materialCount) + ")";
-            Log::Info(msg);
-            // Log the material map texture id and shader id for the created model
-            if (model.materialCount > 0) {
-                int mid = model.materials[0].maps[MATERIAL_MAP_ALBEDO].texture.id;
-                int sid = static_cast<int>(model.materials[0].shader.id);
-                Log::Info(std::string("GreedyMesher: model material[0] shader id=") + std::to_string(sid) + " tex id=" + std::to_string(mid));
-            }
-
-            // Dump first few texcoords from the local 'uvs' vector for debugging
-            int vertexCount = static_cast<int>(verts.size() / 3);
-            if (!uvs.empty() && vertexCount > 0) {
-                int toDump = std::min(4, vertexCount);
-                std::string uvlog = "GreedyMesher: sample uvs:";
-                for (int vi = 0; vi < toDump; ++vi) {
-                    float u = uvs[vi*2];
-                    float v = uvs[vi*2 + 1];
-                    uvlog += " (" + std::to_string(u) + "," + std::to_string(v) + ")";
-                }
-                Log::Info(uvlog);
-            }
-        }
-    } catch (...) {
-        // atlas not found; continue without binding
-        Log::Info("GreedyMesher: no atlas found to bind");
-    }
+    // No atlas/texture binding here. We intentionally avoid assigning any external
+    // texture to the model's material so the mesh draws with the default material.
+    // This keeps greedy meshing and block geometry intact while deferring any
+    // texture/atlas plumbing until later.
 
     if (chunk.hasModel) UnloadModel(chunk.model);
     chunk.model = model; chunk.hasModel = true;

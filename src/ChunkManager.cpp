@@ -18,7 +18,7 @@ namespace {
 }
 
 namespace ChunkManager {
-    static bool g_drawVoxelDebug = false; // default to meshed rendering
+    static bool g_drawVoxelDebug = true; // default to voxel debug so terrain is immediately visible
 
     void Init() {
         g_generator = std::make_unique<HeightmapGenerator>();
@@ -65,7 +65,7 @@ namespace ChunkManager {
         }
 
         const int S = Chunk::SIZE;
-        static bool drawnTestPlane = false;
+    // previously used for a one-time debug draw; unused now
         for (auto &p : g_chunkMap) {
             Chunk* ch = p.second.get();
             if (g_drawVoxelDebug) {
