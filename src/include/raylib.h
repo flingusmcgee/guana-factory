@@ -579,7 +579,7 @@ typedef enum {
     KEY_APOSTROPHE      = 39,       // Key: '
     KEY_COMMA           = 44,       // Key: ,
     KEY_MINUS           = 45,       // Key: -
-    KEY_PERIOD          = 46,       // Key: .
+    KEY_PERIOD          = 46,       // Key: 
     KEY_SLASH           = 47,       // Key: /
     KEY_ZERO            = 48,       // Key: 0
     KEY_ONE             = 49,       // Key: 1
@@ -676,7 +676,7 @@ typedef enum {
     KEY_KP_7            = 327,      // Key: Keypad 7
     KEY_KP_8            = 328,      // Key: Keypad 8
     KEY_KP_9            = 329,      // Key: Keypad 9
-    KEY_KP_DECIMAL      = 330,      // Key: Keypad .
+    KEY_KP_DECIMAL      = 330,      // Key: Keypad 
     KEY_KP_DIVIDE       = 331,      // Key: Keypad /
     KEY_KP_MULTIPLY     = 332,      // Key: Keypad *
     KEY_KP_SUBTRACT     = 333,      // Key: Keypad -
@@ -959,7 +959,7 @@ typedef bool (*SaveFileTextCallback)(const char *fileName, const char *text); //
 //------------------------------------------------------------------------------------
 // Global Variables Definition
 //------------------------------------------------------------------------------------
-// It's lonely here...
+// It's lonely here
 
 //------------------------------------------------------------------------------------
 // Window and Graphics Device Functions (Module: core)

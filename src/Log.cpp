@@ -3,20 +3,40 @@
 #include <chrono>
 #include <ctime>
 #include <string>
+#include <mutex>
+#include "Config.h"
+// Platform mkdir
+#if defined(_WIN32) || defined(_WIN64)
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 // Define the static logfile member
 std::ofstream Log::logfile;
 
 // A private helper function to get a clean timestamp string
-static std::string GetTimestamp() {
-    auto now = std::chrono::system_clock::now();
-    auto in_time_t = std::chrono::system_clock::to_time_t(now);
-    
-    char time_buffer[26];
-    ctime_s(time_buffer, sizeof(time_buffer), &in_time_t);
-    std::string timestamp(time_buffer);
-    timestamp.pop_back(); // Remove the trailing newline character
-    return timestamp;
+static std::string GetTimestamp() noexcept {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    std::time_t in_time_t = system_clock::to_time_t(now);
+
+    // Use thread-safe localtime variants where available and format with strftime
+    std::tm tm{};
+#if defined(_WIN32) || defined(_WIN64)
+    // MSVC / Windows
+    localtime_s(&tm, &in_time_t);
+#else
+    // POSIX
+    localtime_r(&in_time_t, &tm);
+#endif
+
+    char time_buffer[64];
+    if (std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", &tm) == 0) {
+        return std::string();
+    }
+    return std::string(time_buffer);
 }
 
 // Initialize the logging system and open the timestamped log file
@@ -29,9 +49,64 @@ void Log::Init() {
         }
     }
     std::string filename = "iguana - " + timestamp + ".log";
-    
-    // Command the one, true, static scribe to open the file
-    logfile.open(filename, std::ios::out | std::ios::trunc);
+
+    // Allow overriding the log directory from config
+    // Avoid std::filesystem to keep editor/tooling happy; use a simple string path
+    std::string defaultLogDir = "build/log";
+    std::string logDirStr = defaultLogDir;
+    try {
+        if (!Config::IsLoaded()) {
+            // Config may not be loaded yet; attempt to load it once
+            Config::Load("config.ini");
+        }
+        logDirStr = Config::GetString("log.dir", defaultLogDir);
+    } catch (...) {
+        logDirStr = defaultLogDir;
+    }
+
+    try {
+        // Ensure the directory exists (create recursively if needed) so the
+        // logfile is created under the intended folder instead of the current
+        // working directory.
+        auto make_dirs = [](const std::string &path) {
+            if (path.empty()) return;
+            // Normalize separators to '/'
+            std::string p = path;
+            for (char &c : p) if (c == '\\') c = '/';
+            // Remove trailing slash
+            if (!p.empty() && p.back() == '/') p.pop_back();
+            size_t pos = 0;
+            while (true) {
+                size_t next = p.find('/', pos);
+                std::string sub = (next == std::string::npos) ? p : p.substr(0, next);
+                if (!sub.empty()) {
+#if defined(_WIN32) || defined(_WIN64)
+                    _mkdir(sub.c_str());
+#else
+                    mkdir(sub.c_str(), 0755);
+#endif
+                }
+                if (next == std::string::npos) break;
+                pos = next + 1;
+            }
+        };
+
+        std::string fullPath = logDirStr;
+        if (!fullPath.empty() && fullPath.back() != '/' && fullPath.back() != '\\') fullPath += "/";
+        // Create the directory tree
+        if (!logDirStr.empty()) make_dirs(logDirStr);
+        fullPath += filename;
+
+        // Attempt to open the file at the requested location; if that fails,
+        // fall back to the current directory.
+        logfile.open(fullPath, std::ios::out | std::ios::trunc);
+        if (!logfile.is_open()) {
+            logfile.open(filename, std::ios::out | std::ios::trunc);
+        }
+    } catch (...) {
+        // fallback to current directory if anything unexpected happens
+        logfile.open(filename, std::ios::out | std::ios::trunc);
+    }
 
     if (!logfile.is_open()) {
         std::cerr << "CRITICAL ERROR: Failed to open " << filename << " for writing" << std::endl;
@@ -66,9 +141,12 @@ void Log::Error(const std::string& message) {
 
 // The core, private function that writes to all targets
 void Log::Write(LogLevel level, const std::string& message) {
+    static std::mutex write_mutex;
+    std::lock_guard<std::mutex> guard(write_mutex);
+
     std::string timestamp = GetTimestamp();
     std::string level_str;
-    
+
     // Console Output
     switch (level) {
         case LogLevel::Info:

@@ -2,6 +2,7 @@
 #include "include/raylib.h"
 #include <string>
 #include <map>
+#include <unordered_map>
 
 // A static class for loading and accessing all game assets
 class AssetManager {
@@ -13,6 +14,6 @@ public:
     static bool ModelExists(const std::string& id); // New! Check if a model exists
 
 private:
-    static std::map<std::string, Model> models;
-    static std::map<std::string, Texture2D> textures;
+    static std::unordered_map<std::string, Model> models;
+    static std::unordered_map<std::string, Texture2D> textures;
 };

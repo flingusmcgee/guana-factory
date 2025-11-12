@@ -18,9 +18,10 @@ Entity* EntityManager::CreateEntity() {
     for (int i = 0; i < MAX_ENTITIES; ++i) {
         if (!entity_pool[i].is_active) {
             // Reset the entity to a clean state before use
-            entity_pool[i] = Entity(); 
+            entity_pool[i] = Entity();
             entity_pool[i].is_active = true;
             entity_pool[i].id = i;
+            ++active_count;
             return &entity_pool[i];
         }
     }
@@ -61,9 +62,12 @@ void EntityManager::UpdateAll(float dt) {
 
     // A second loop
     // This deactivates any entities that were marked for death during the update phase
-    for (auto& entity : entity_pool) {
+    for (size_t i = 0; i < entity_pool.size(); ++i) {
+        auto& entity = entity_pool[i];
         if (entity.is_active && entity.needs_to_die) {
-            entity.is_active = false;
+            entity = Entity();
+            entity.id = static_cast<unsigned int>(i);
+            --active_count;
         }
     }
 }
@@ -102,4 +106,8 @@ void EntityManager::RenderAll() {
             DrawModel(entity.model, entity.position, 1.0f, entity.color); // Use entity's colour now
         }
     }
+}
+
+int EntityManager::GetActiveCount() const {
+    return active_count;
 }

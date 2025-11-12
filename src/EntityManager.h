@@ -16,6 +16,7 @@ public:
     Entity* CreateEntityFromArchetype(const std::string& name, Vector3 position); // The Factory
     void UpdateAll(float dt);
     void RenderAll();
+    int GetActiveCount() const;
 
     Entity* FindEntityByID(unsigned int id);
     std::vector<Entity*> FindEntitiesWithTag(const std::string& tag);
@@ -23,6 +24,7 @@ public:
 private:
     EntityManager() {}
     std::vector<Entity> entity_pool;
+    int active_count = 0;
 
     // Instances of the core gameplay systems
     PhysicsSystem physicsSystem;

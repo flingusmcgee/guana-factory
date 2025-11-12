@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <map>
+#include <unordered_map>
 
 using EventCallback = std::function<void(const Event&)>;
 
@@ -17,5 +18,5 @@ public:
 private:
     EventManager() {} // Private constructor for singleton
     // Subscribers mapped by event type
-    std::map<EventType, std::vector<EventCallback>> subscribers; 
+    std::unordered_map<EventType, std::vector<EventCallback>> subscribers; 
 };

@@ -1,7 +1,10 @@
 #include "ArchetypeManager.h"
 #include "Log.h"
+#include "include/raylib.h"
 #include <fstream>
 #include <string>
+#include <cctype>
+// <algorithm> removed because it's not needed and causes editor warnings
 
 // Provide a single, global instance
 ArchetypeManager& ArchetypeManager::GetInstance() {
@@ -11,14 +14,12 @@ ArchetypeManager& ArchetypeManager::GetInstance() {
 
 // Helper function to trim leading and trailing whitespace from a string
 static std::string trim(const std::string& s) {
+    if (s.empty()) return std::string();
     auto start = s.begin();
-    while (start != s.end() && std::isspace(*start)) {
-        ++start;
-    }
-    auto end = s.end();
-    do {
-        --end;
-    } while (std::distance(start, end) > 0 && std::isspace(*end));
+    while (start != s.end() && std::isspace(static_cast<unsigned char>(*start))) ++start;
+    if (start == s.end()) return std::string();
+    auto end = s.end() - 1;
+    while (end != start && std::isspace(static_cast<unsigned char>(*end))) --end;
     return std::string(start, end + 1);
 }
 
@@ -31,11 +32,12 @@ void ArchetypeManager::LoadArchetypesFromDirectory(const std::string& directoryP
     for (unsigned int i = 0; i < files.count; i++) {
         const char* path = files.paths[i];
         if (IsFileExtension(path, ".archetype")) {
-            std::string name = GetFileNameWithoutExt(path);
-            // Check prevents reloading an archetype that was already loaded as a parent
-            if (archetypes.find(name) == archetypes.end()) {
-                LoadFile(path);
-            }
+            // LoadDirectoryFiles may return paths that already include the directory prefix
+            // so extract the filename portion to avoid double-prefixing later.
+            std::string full(path);
+            size_t pos = full.find_last_of("/\\");
+            std::string filename = (pos == std::string::npos) ? full : full.substr(pos + 1);
+            LoadFileToMap(filename);
         }
     }
     UnloadDirectoryFiles(files);
@@ -50,51 +52,215 @@ Archetype* ArchetypeManager::GetArchetype(const std::string& name) {
     return nullptr;
 }
 
-// The core function that recursively parses a file given its full path
+// Public entry that initializes cycle detection state
 Archetype ArchetypeManager::LoadFile(const std::string& filepath) {
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        Log::Error("Failed to open archetype file: " + filepath);
-        return Archetype(); // Return an empty archetype on failure
+    std::unordered_set<std::string> loading;
+    return LoadFileInternal(filepath, loading);
+}
+
+bool ArchetypeManager::LoadFileToMap(const std::string& filepath) {
+    Archetype a = LoadFile(filepath);
+    if (a.isEmpty()) {
+        return false;
+    }
+    // Use lightweight filename extraction to avoid relying on std::filesystem
+    std::string mapKey = GetFileNameWithoutExt(filepath.c_str());
+
+    // Prefer the archetype's tag as the map key when available (so files like cube_base.archetype
+    // that declare tag: cube are stored under 'cube')
+    if (!a.tag.empty()) {
+        mapKey = a.tag;
     }
 
-    std::string name = GetFileNameWithoutExt(filepath.c_str());
+    a.source_path = filepath;
+
+    auto existing = archetypes.find(mapKey);
+    if (existing != archetypes.end()) {
+        if (existing->second.source_path == a.source_path) {
+            archetypes[mapKey] = a;
+        } else {
+            Log::Warning("Skipping archetype '" + mapKey + "' from '" + a.source_path + "' because a different archetype with the same key already exists from '" + existing->second.source_path + "'");
+            return false;
+        }
+    } else {
+        archetypes[mapKey] = a;
+    }
+    return true;
+}
+
+// Internal implementation with cycle detection
+Archetype ArchetypeManager::LoadFileInternal(const std::string& filepath, std::unordered_set<std::string>& loading) {
+    // Resolve relative paths against the last scanned directory. Keep this simple
+    // to avoid depending on std::filesystem which may not be available to
+    // editor tooling / IntelliSense.
+    std::string filepathStr = filepath;
+    // If the path isn't absolute, prefix with current_directory
+    auto isAbsolute = [](const std::string &s)->bool {
+        if (s.empty()) return false;
+        // Windows drive letter, e.g. C:\\ or UNC paths starting with \\ (escaped in a C++ string)
+        if (s.size() > 1 && s[1] == ':') return true;
+        if (s[0] == '/' || s[0] == '\\') return true;
+        return false;
+    };
+    if (!isAbsolute(filepathStr) && !current_directory.empty()) {
+        // If the filepath already contains a directory portion, assume it's either
+        // relative to current CWD or intentionally prefixed; only prefix when the
+        // filepath is a simple filename without separators.
+        if (filepathStr.find_first_of("/\\") == std::string::npos) {
+            std::string sep = "/";
+            if (!current_directory.empty() && (current_directory.back() == '/' || current_directory.back() == '\\')) sep = "";
+            filepathStr = current_directory + sep + filepathStr;
+        }
+    }
+
+    std::ifstream file(filepathStr);
+    if (!file.is_open()) {
+        Log::Error("Failed to open archetype file: " + filepathStr);
+        return Archetype(); // Return an empty archetype
+    }
+
+    std::string name = GetFileNameWithoutExt(filepathStr.c_str());
     Log::Info("Parsing archetype: " + name);
-    Archetype newArchetype;
-    
+
+    // If we're already loading this archetype, abort to avoid cycles
+    if (loading.find(filepathStr) != loading.end()) {
+        Log::Error("Detected cyclic inheritance while loading: " + filepathStr);
+        return Archetype();
+    }
+
+    // Temporary containers
+    Archetype child;
+    struct Flags {
+        bool tag=false;
+        bool model_id=false;
+        bool color_r=false;
+        bool color_g=false;
+        bool color_b=false;
+        bool color_a=false;
+        bool vel_x=false;
+        bool vel_y=false;
+        bool vel_z=false;
+    } flags;
+
+    std::string parentName;
     std::string line;
     while (std::getline(file, line)) {
-        size_t delimiterPos = line.find(':');
-        if (delimiterPos == std::string::npos || line[0] == '#') continue;
+        std::string tline = trim(line);
+        if (tline.empty() || tline[0] == '#') continue;
 
-        std::string key = trim(line.substr(0, delimiterPos));
-        std::string value = trim(line.substr(delimiterPos + 1));
+        size_t delimiterPos = tline.find(':');
+        if (delimiterPos == std::string::npos) continue;
+
+        std::string key = trim(tline.substr(0, delimiterPos));
+        std::string value = trim(tline.substr(delimiterPos + 1));
 
         if (key == "inherits") {
-            std::string parentName = value;
-            // This is the new, robust path construction
-            std::string parentFilepath = current_directory + "/" + parentName + ".archetype";
-            
-            if (archetypes.find(parentName) == archetypes.end()) {
-                // Perform the recursive call with the full, correct path
-                newArchetype = LoadFile(parentFilepath);
-            } else {
-                newArchetype = archetypes.at(parentName);
-            }
+            parentName = value;
+        } else if (key == "tag") {
+            child.tag = value; flags.tag = true; child.populated = true;
+        } else if (key == "model_id") {
+            child.model_id = value; flags.model_id = true; child.populated = true;
         }
-        // Overwrite or set fields
-        else if (key == "tag") newArchetype.tag = value;
-        else if (key == "model_id") newArchetype.model_id = value;
-        else if (key == "color_r") newArchetype.color.r = (unsigned char)std::stoi(value);
-        else if (key == "color_g") newArchetype.color.g = (unsigned char)std::stoi(value);
-        else if (key == "color_b") newArchetype.color.b = (unsigned char)std::stoi(value);
-        else if (key == "color_a") newArchetype.color.a = (unsigned char)std::stoi(value);
-        else if (key == "velocity_x") newArchetype.velocity.x = std::stof(value);
-        else if (key == "velocity_y") newArchetype.velocity.y = std::stof(value);
-        else if (key == "velocity_z") newArchetype.velocity.z = std::stof(value);
+        else if (key == "color_r") {
+            try {
+                child.color.r = static_cast<unsigned char>(std::stoi(value));
+                flags.color_r = true; child.populated = true;
+                if (child.color.r == WHITE.r) Log::Info("Archetype '" + name + "' explicitly sets color_r to white (default)");
+            } catch (...) { Log::Warning("Invalid color_r for " + name + ", value='" + value + "'"); }
+        }
+        else if (key == "color_g") {
+            try {
+                child.color.g = static_cast<unsigned char>(std::stoi(value));
+                flags.color_g = true; child.populated = true;
+                if (child.color.g == WHITE.g) Log::Info("Archetype '" + name + "' explicitly sets color_g to white (default)");
+            } catch (...) { Log::Warning("Invalid color_g for " + name + ", value='" + value + "'"); }
+        }
+        else if (key == "color_b") {
+            try {
+                child.color.b = static_cast<unsigned char>(std::stoi(value));
+                flags.color_b = true; child.populated = true;
+                if (child.color.b == WHITE.b) Log::Info("Archetype '" + name + "' explicitly sets color_b to white (default)");
+            } catch (...) { Log::Warning("Invalid color_b for " + name + ", value='" + value + "'"); }
+        }
+        else if (key == "color_a") {
+            try {
+                child.color.a = static_cast<unsigned char>(std::stoi(value));
+                flags.color_a = true; child.populated = true;
+                if (child.color.a == WHITE.a) Log::Info("Archetype '" + name + "' explicitly sets color_a to white (default)");
+            } catch (...) { Log::Warning("Invalid color_a for " + name + ", value='" + value + "'"); }
+        }
+        else if (key == "velocity_x") {
+            try {
+                child.velocity.x = std::stof(value); flags.vel_x = true; child.populated = true;
+                if (child.velocity.x == 0.0f) Log::Info("Archetype '" + name + "' explicitly sets velocity_x to 0.0 (default)");
+            } catch (...) { Log::Warning("Invalid velocity_x for " + name + ", value='" + value + "'"); }
+        }
+        else if (key == "velocity_y") {
+            try {
+                child.velocity.y = std::stof(value); flags.vel_y = true; child.populated = true;
+                if (child.velocity.y == 0.0f) Log::Info("Archetype '" + name + "' explicitly sets velocity_y to 0.0 (default)");
+            } catch (...) { Log::Warning("Invalid velocity_y for " + name + ", value='" + value + "'"); }
+        }
+        else if (key == "velocity_z") {
+            try {
+                child.velocity.z = std::stof(value); flags.vel_z = true; child.populated = true;
+                if (child.velocity.z == 0.0f) Log::Info("Archetype '" + name + "' explicitly sets velocity_z to 0.0 (default)");
+            } catch (...) { Log::Warning("Invalid velocity_z for " + name + ", value='" + value + "'"); }
+        }
     }
 
-    archetypes[name] = newArchetype;
     file.close();
-    return newArchetype;
+
+    // Now perform loading/merging. Mark this archetype as loading
+    loading.insert(filepathStr);
+
+    Archetype result;
+    // If we have a parent, try to load it (search in same directory as this file)
+    if (!parentName.empty()) {
+        // Prefer already-loaded parent
+        if (archetypes.find(parentName) != archetypes.end()) {
+            result = archetypes.at(parentName);
+        } else {
+            // Compute parent path by joining directory of filepathStr with the parent name
+            size_t pos = filepathStr.find_last_of("/\\");
+            std::string dir = (pos == std::string::npos) ? std::string() : filepathStr.substr(0, pos);
+            std::string parentPath = dir.empty() ? (parentName + ".archetype") : (dir + "/" + parentName + ".archetype");
+            // Attempt to load the parent; if it fails, log the attempted path for easier debugging
+            Archetype parent = LoadFileInternal(parentPath, loading);
+            if (parent.isEmpty()) {
+                Log::Error("Failed to load parent archetype '" + parentName + "' for child '" + name + "'. Tried path: " + parentPath);
+            }
+            result = parent;
+        }
+    }
+
+    // Merge: only apply child fields that were explicitly set
+    if (flags.tag) result.tag = child.tag;
+    if (flags.model_id) result.model_id = child.model_id;
+    if (flags.color_r) result.color.r = child.color.r;
+    if (flags.color_g) result.color.g = child.color.g;
+    if (flags.color_b) result.color.b = child.color.b;
+    if (flags.color_a) result.color.a = child.color.a;
+    if (flags.vel_x) result.velocity.x = child.velocity.x;
+    if (flags.vel_y) result.velocity.y = child.velocity.y;
+    if (flags.vel_z) result.velocity.z = child.velocity.z;
+
+    // Mark result as populated if the parent actually had data (result.populated already set),
+    // or if the child explicitly set any field
+    bool childSetAny = flags.tag || flags.model_id || flags.color_r || flags.color_g || flags.color_b || flags.color_a || flags.vel_x || flags.vel_y || flags.vel_z;
+    if (result.populated || childSetAny) {
+        result.populated = true;
+    }
+
+    result.source_path = filepathStr;
+
+    // Finished loading this archetype
+    loading.erase(filepathStr);
+
+    archetypes[name] = result;
+    return result;
+}
+
+size_t ArchetypeManager::GetLoadedCount() const {
+    return archetypes.size();
 }
