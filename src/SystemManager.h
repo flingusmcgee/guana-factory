@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include "System.h"
+#include <algorithm>
 
 class SystemManager {
 public:
