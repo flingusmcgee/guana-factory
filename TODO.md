@@ -21,11 +21,11 @@ How to use this file
 
 ## Medium priority (next milestone)
 
-- [ ] Improve logging system (Owner: ) — Priority: P1 — Est: 1d
+- [x] Improve logging system (Owner: ) — Priority: P1 — Est: 1d
   - Tasks:
-    - Add configurable log level (INFO/WARN/ERROR/DEBUG).
+    - Add configurable log level (DEBUG/INFO/WARN/ERROR).
     - Option to route debug logs to separate file.
-  - Acceptance: `config.ini` toggles debug-level logging without recompiling.
+  - Acceptance: ✓ `config.ini` toggles debug-level logging without recompiling; DEBUG level added; separate debug file support.
 
 - [ ] Collision system improvements (Owner: ) — Priority: P1 — Est: 2d
   - Tasks:
