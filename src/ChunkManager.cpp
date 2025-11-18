@@ -4,8 +4,6 @@
 #include "HeightmapGenerator.h"
 #include "Log.h"
 #include "GreedyMesher.h"
-#include "Input.h"
-#include "AssetManager.h"
 #include <vector>
 #include <memory>
 #include <unordered_map>
@@ -13,24 +11,75 @@
 
 namespace {
     std::unique_ptr<WorldGenerator> g_generator;
-    std::unordered_map<std::string, std::unique_ptr<Chunk>> g_chunkMap;
+    std::unordered_map<std::string, std::shared_ptr<Chunk>> g_chunkMap;
+    ChunkRegistry g_registry;
     static inline std::string KeyFor(int x,int y,int z) { return std::to_string(x) + "," + std::to_string(y) + "," + std::to_string(z); }
 }
 
 namespace ChunkManager {
-    static bool g_drawVoxelDebug = true; // default to voxel debug so terrain is immediately visible
+    ChunkRegistry& GetRegistry() {
+        return g_registry;
+    }
+
+    std::shared_ptr<Chunk> GetChunkByPath(const ChunkPath& path) {
+        return g_registry.Get(path);
+    }
+
+    void SaveAllChunks(const std::string& basePath) {
+        auto chunks = g_registry.GetAll();
+        int saved = 0;
+        int failed = 0;
+
+        for (auto& chunk : chunks) {
+            if (chunk && chunk->Save(basePath)) {
+                ++saved;
+            } else {
+                ++failed;
+            }
+        }
+
+        Log::Info("ChunkManager::SaveAllChunks - Saved " + std::to_string(saved) + " chunks, " + 
+                  std::to_string(failed) + " failed (total " + std::to_string(chunks.size()) + ")");
+    }
+
+    bool LoadChunk(const ChunkPath& path, const std::string& basePath) {
+        auto chunk = std::make_shared<Chunk>();
+        chunk->InitWithPath(path);
+        
+        if (chunk->Load(basePath)) {
+            if (!GreedyMesher::MeshChunk(*chunk)) {
+                Log::Warning("ChunkManager::LoadChunk - Failed to mesh loaded chunk " + path.ToHexString());
+            }
+
+            if (g_registry.Add(chunk)) {
+                Log::Info("ChunkManager::LoadChunk - Successfully loaded and registered chunk " + path.ToHexString());
+                return true;
+            } else {
+                Log::Warning("ChunkManager::LoadChunk - Failed to register loaded chunk " + path.ToHexString() + " (already exists?)");
+                return false;
+            }
+        } else {
+            Log::Warning("ChunkManager::LoadChunk - Failed to load chunk data from " + basePath);
+            return false;
+        }
+    }
 
     void Init() {
         g_generator = std::make_unique<HeightmapGenerator>();
-        const int R = 1;
+        // Generate 8x8 = 64 chunks around origin
         const int S = Chunk::SIZE;
         int totalFilled = 0;
         g_chunkMap.clear();
-        for (int cx = -R; cx <= R; ++cx) {
-            for (int cz = -R; cz <= R; ++cz) {
+        g_registry.Clear();
+        
+        for (int cx = -4; cx <= 3; ++cx) {
+            for (int cz = -4; cz <= 3; ++cz) {
                 int cy = 0;
-                auto ch = std::make_unique<Chunk>();
+                auto ch = std::make_shared<Chunk>();
                 ch->Init(ChunkCoord{cx,cy,cz});
+                ChunkPath p;
+                p.Append(cx, cy, cz);
+                ch->SetPath(p);
                 int volume = S*S*S;
                 std::vector<BlockId> blocks(volume);
                 g_generator->GenerateChunk(ch->GetCoord(), blocks.data(), S);
@@ -42,11 +91,16 @@ namespace ChunkManager {
                 }
                 totalFilled += filled;
 
-                // Build greedy mesh for this chunk so we render an optimized model
                 if (!GreedyMesher::MeshChunk(*ch)) {
-                    Log::Warning("GreedyMesher failed to mesh chunk: " + KeyFor(cx,cy,cz));
+                    Log::Warning("GreedyMesher failed for chunk " + KeyFor(cx, cy, cz));
                 }
-                g_chunkMap.emplace(KeyFor(cx,cy,cz), std::move(ch));
+
+                Log::Info(std::string("Chunk created: ") + ch->GetIdentifier() + 
+                          " at coord (" + std::to_string(cx) + "," + std::to_string(cy) + "," + std::to_string(cz) + ")");
+                
+                g_chunkMap.emplace(KeyFor(cx,cy,cz), ch);
+                
+                g_registry.Add(ch);
             }
         }
         Log::Info(std::string("Chunks total filled blocks: ") + std::to_string(totalFilled));
@@ -58,45 +112,41 @@ namespace ChunkManager {
     }
 
     void Render(const Camera& cam) {
-        Input::Update();
-        if (Input::WasPressed("debug_toggle")) {
-            g_drawVoxelDebug = !g_drawVoxelDebug;
-            Log::Info(std::string("Voxel debug: ") + (g_drawVoxelDebug ? "ON" : "OFF"));
-        }
-
+        (void)cam; // cam is unused for now; silence -Werror=unused-parameter
         const int S = Chunk::SIZE;
-    // previously used for a one-time debug draw; unused now
         for (auto &p : g_chunkMap) {
             Chunk* ch = p.second.get();
-            if (g_drawVoxelDebug) {
-                Color dbgCol = {150, 111, 51, 255};
-                for (int x = 0; x < S; ++x) {
-                    for (int y = 0; y < S; ++y) {
-                        for (int z = 0; z < S; ++z) {
-                            BlockId id = ch->Get(x,y,z);
-                            if (id == 0) continue;
-                            Vector3 pos = { ch->GetCoord().x * S + static_cast<float>(x), ch->GetCoord().y * S + static_cast<float>(y), ch->GetCoord().z * S + static_cast<float>(z) };
-                            DrawCube(pos, 1.0f, 1.0f, 1.0f, dbgCol);
-                        }
-                    }
+            if (!ch->hasModel) {
+                if (!GreedyMesher::MeshChunk(*ch)) {
+                    Log::Warning("GreedyMesher remesh failed for chunk " + KeyFor(ch->GetCoord().x, ch->GetCoord().y, ch->GetCoord().z));
+                    continue;
                 }
-            } else {
-                if (ch->hasModel) {
-                    // Draw the chunk model; place it at chunk origin
-                    Vector3 origin = { static_cast<float>(ch->GetCoord().x * S), static_cast<float>(ch->GetCoord().y * S), static_cast<float>(ch->GetCoord().z * S) };
-                    // Draw the chunk model as-is. We intentionally avoid binding any atlas texture here
-                    // so the rendering path remains the same as prior to adding per-block texture plumbing.
-                    DrawModel(ch->model, origin, 1.0f, WHITE);
-                } else {
-                    bool any = false;
-                    for (int x = 0; x < S && !any; ++x) for (int y = 0; y < S && !any; ++y) for (int z = 0; z < S; ++z) if (ch->Get(x,y,z) != 0) { any = true; break; }
-                    if (any) {
-                        Color dirtCol = {150, 111, 51, 200};
-                        Vector3 center = { ch->GetCoord().x * S + S*0.5f, ch->GetCoord().y * S + S*0.5f, ch->GetCoord().z * S + S*0.5f };
-                        DrawCube(center, static_cast<float>(S), static_cast<float>(S), static_cast<float>(S), dirtCol);
-                    }
-                }
+            }
+
+            Vector3 origin = {
+                static_cast<float>(ch->GetCoord().x * S),
+                static_cast<float>(ch->GetCoord().y * S),
+                static_cast<float>(ch->GetCoord().z * S)
+            };
+
+            DrawModel(ch->model, origin, 1.0f, WHITE);
+
+            Color outline = BLACK;
+            for (const Quad& quad : ch->quads) {
+                Vector3 a = { origin.x + quad.corners[0].x, origin.y + quad.corners[0].y, origin.z + quad.corners[0].z };
+                Vector3 b = { origin.x + quad.corners[1].x, origin.y + quad.corners[1].y, origin.z + quad.corners[1].z };
+                Vector3 c = { origin.x + quad.corners[2].x, origin.y + quad.corners[2].y, origin.z + quad.corners[2].z };
+                Vector3 d = { origin.x + quad.corners[3].x, origin.y + quad.corners[3].y, origin.z + quad.corners[3].z };
+
+                DrawLine3D(a, b, outline);
+                DrawLine3D(b, c, outline);
+                DrawLine3D(c, d, outline);
+                DrawLine3D(d, a, outline);
+
+                DrawLine3D(a, c, outline);
+                DrawLine3D(b, d, outline);
             }
         }
     }
 }
+
