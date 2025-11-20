@@ -8,6 +8,7 @@
 #include "SystemManager.h"
 #include "Input.h"
 #include "DebugHud.h"
+#include "ChunkManager.h"
 #include <cmath>
 #include <cstdio>
 #include <chrono>
@@ -101,6 +102,8 @@ void Game::Init() {
     // Load assets and initialize systems
     // Allow the icon path to be configurable
     AssetManager::LoadAssets();
+    // Initialize chunks/terrain
+    ChunkManager::Init();
     // Initialize registered systems
     SystemManager::GetInstance().InitAll();
     // Try a couple of likely archetype paths (executable working directory may vary)
@@ -271,6 +274,9 @@ void Game::Render() {
 
     BeginMode3D(camera);
         DrawGrid(20, 1.0f);
+        // Render terrain chunks
+        ChunkManager::Render(camera);
+        // Render entities on top
         EntityManager::GetInstance().RenderAll();
     EndMode3D();
     DrawFPS(10, 10);
@@ -298,6 +304,7 @@ void Game::Render() {
 // Unload assets and close the window
 void Game::Shutdown() {
     AssetManager::UnloadAssets();
+    ChunkManager::Shutdown();
     SystemManager::GetInstance().ShutdownAll();
     EnableCursor();
     CloseWindow();
