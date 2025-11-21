@@ -3,7 +3,7 @@
 
 // Helper function to normalize a vector
 static Vector3 V3Normalize(Vector3 v) {
-    float len = std::sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+    float len = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
     if (len > 0.0001f) {
         return {v.x / len, v.y / len, v.z / len};
     }
@@ -70,9 +70,9 @@ std::unordered_set<uint32_t> VisibilityRaySystem::ComputeVisibleChunks(
             // Simple rotation: scale forward by angle factor
             // (This is a simplified approximation)
             Vector3 rayDir = forward;
-            rayDir.x += std::sinf(horzRad) * right.x;
-            rayDir.z += std::sinf(horzRad) * right.z;
-            rayDir.y += std::sinf(vertRad) * 0.5f;  // Vertical component
+            rayDir.x += sinf(horzRad) * right.x;
+            rayDir.z += sinf(horzRad) * right.z;
+            rayDir.y += sinf(vertRad) * 0.5f;  // Vertical component
             
             rayDir = V3Normalize(rayDir);
 

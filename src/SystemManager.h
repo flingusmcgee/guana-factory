@@ -1,11 +1,11 @@
 #pragma once
 
 #include <vector>
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include "System.h"
-#include <algorithm>
 
 class SystemManager {
 public:

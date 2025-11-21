@@ -1,25 +1,54 @@
 #pragma once
-#include "WorldGenerator.h"
-#include "include/raylib.h"
 #include <vector>
 #include <string>
+#include "include/raylib.h"
+#include "ChunkPath.h"
+#include "WorldGenerator.h"
+#include "Quad.h"
+
+
+typedef unsigned char BlockId;
+
 
 class Chunk {
 public:
-    static const int SIZE = 8; // blocks per axis (reduced to avoid 16-bit index overflow in prototype)
-    Chunk();
-    ~Chunk();
+static constexpr int SIZE = 16;
 
-    void Init(const ChunkCoord& coord);
-    BlockId Get(int x, int y, int z) const;
-    void Set(int x, int y, int z, BlockId id);
-    const ChunkCoord& GetCoord() const { return coord; }
 
-    // Mesh/model produced by meshing (may be empty)
-    Model model;
-    bool hasModel = false;
+bool hasModel = false;
+Model model{};
+std::vector<Quad> quads;
+
+
+Chunk();
+~Chunk();
+
+void Init(const ChunkCoord& c);
+void InitWithPath(const ChunkPath& p);
+
+
+void SetPath(const ChunkPath& p);
+const ChunkPath& GetPath() const;
+
+
+const ChunkCoord& GetCoord() const;
+
+
+std::string GetIdentifier() const;
+
+
+BlockId Get(int x, int y, int z) const;
+
+
+void Set(int x, int y, int z, BlockId id);
+
+
+bool Save(const std::string&) const;
+bool Load(const std::string&);
+
 
 private:
-    ChunkCoord coord;
-    std::vector<BlockId> blocks; // SIZE^3
+ChunkCoord coord{};
+ChunkPath path;
+std::vector<BlockId> blocks = std::vector<BlockId>(SIZE*SIZE*SIZE, 0);
 };
